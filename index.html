@@ -1,0 +1,1814 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TeMapeo — Dashboard Abud & Cía</title>
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<!-- Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   VARIABLES Y RESET
+   ============================================================ */
+:root {
+  --bg:        #0d1117;
+  --bg2:       #161b22;
+  --bg3:       #21262d;
+  --border:    #30363d;
+  --accent:    #00BFFF;
+  --accent2:   #0099cc;
+  --text:      #e6edf3;
+  --text-dim:  #8b949e;
+  --green:     #1A9850;
+  --yellow:    #FEE04F;
+  --orange:    #FC8D59;
+  --red:       #D73027;
+  --green-lt:  #91CF60;
+  --green-xl:  #D9EF8B;
+  --green-dk:  #006837;
+
+  /* 7 clases simbología */
+  --c1: #D73027;
+  --c2: #FC8D59;
+  --c3: #FEE08B;
+  --c4: #D9EF8B;
+  --c5: #91CF60;
+  --c6: #1A9850;
+  --c7: #006837;
+
+  --radius: 8px;
+  --font: 'DM Sans', sans-serif;
+  --mono: 'DM Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; overflow: hidden; }
+
+/* ============================================================
+   LAYOUT PRINCIPAL
+   ============================================================ */
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+/* HEADER */
+#header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; height: 56px; background: var(--bg2);
+  border-bottom: 1px solid var(--border); flex-shrink: 0; gap: 16px;
+}
+#header-left { display: flex; align-items: center; gap: 14px; }
+#header-logo { height: 32px; object-fit: contain; }
+#header-title { font-size: 1rem; font-weight: 600; color: var(--accent); letter-spacing: -0.02em; white-space: nowrap; }
+#header-sub { font-size: 0.75rem; color: var(--text-dim); }
+#header-badges { display: flex; gap: 8px; align-items: center; }
+.badge {
+  padding: 3px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.badge-green { background: rgba(26,152,80,0.2); color: var(--green); border: 1px solid rgba(26,152,80,0.4); }
+.badge-blue  { background: rgba(0,191,255,0.15); color: var(--accent); border: 1px solid rgba(0,191,255,0.3); }
+#header-right { display: flex; align-items: center; gap: 10px; }
+.btn-load {
+  display: flex; align-items: center; gap: 6px; padding: 6px 14px;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text); cursor: pointer; font-size: 0.8rem; font-family: var(--font);
+  transition: all 0.15s;
+}
+.btn-load:hover { border-color: var(--accent); color: var(--accent); }
+.btn-load svg { width: 14px; height: 14px; }
+
+/* MAIN AREA */
+#main { display: flex; flex: 1; overflow: hidden; }
+
+/* SIDEBAR */
+#sidebar {
+  width: 280px; flex-shrink: 0; background: var(--bg2);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column;
+  overflow-y: auto; overflow-x: hidden;
+}
+.sidebar-section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.sidebar-section-title {
+  font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-dim); margin-bottom: 10px;
+}
+
+/* Filtros */
+.filter-group { margin-bottom: 10px; }
+.filter-label { font-size: 0.75rem; color: var(--text-dim); margin-bottom: 4px; }
+select, .multi-check-btn {
+  width: 100%; padding: 6px 10px; background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text); font-family: var(--font);
+  font-size: 0.8rem; cursor: pointer; transition: border-color 0.15s;
+}
+select:focus, select:hover { border-color: var(--accent); outline: none; }
+select option { background: var(--bg2); }
+
+.fecha-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip {
+  padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg3); color: var(--text-dim);
+  transition: all 0.15s;
+}
+.chip.active { background: rgba(0,191,255,0.15); border-color: var(--accent); color: var(--accent); }
+
+/* KPI Cards */
+.kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.kpi-card {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 10px 12px;
+}
+.kpi-label { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+.kpi-value { font-size: 1.1rem; font-weight: 700; color: var(--text); margin: 2px 0; font-family: var(--mono); }
+.kpi-sub { font-size: 0.65rem; color: var(--text-dim); }
+.kpi-value.green { color: var(--green); }
+.kpi-value.blue  { color: var(--accent); }
+
+/* Índice selector */
+.indice-btns { display: flex; flex-direction: column; gap: 5px; }
+.indice-btn {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius); cursor: pointer; transition: all 0.15s; text-align: left;
+}
+.indice-btn:hover { border-color: var(--accent); }
+.indice-btn.active { border-color: var(--accent); background: rgba(0,191,255,0.1); }
+.indice-btn-name { font-size: 0.85rem; font-weight: 600; }
+.indice-btn-cat { font-size: 0.65rem; color: var(--text-dim); }
+.indice-btn-avg { font-size: 0.8rem; font-family: var(--mono); color: var(--accent); }
+
+/* Leyenda simbología */
+.legend-items { display: flex; flex-direction: column; gap: 4px; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; }
+.legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.legend-range { color: var(--text-dim); font-family: var(--mono); font-size: 0.65rem; margin-left: auto; }
+
+/* Capas toggle */
+.layer-toggles { display: flex; flex-direction: column; gap: 6px; }
+.layer-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px; background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius); cursor: pointer; transition: all 0.15s;
+}
+.layer-toggle:hover { border-color: var(--accent); }
+.layer-toggle-left { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
+.layer-icon { width: 16px; height: 16px; }
+/* Switch */
+.switch { position: relative; display: inline-block; width: 32px; height: 18px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider-sw {
+  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--border); border-radius: 20px; transition: 0.2s;
+}
+.slider-sw:before {
+  position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px;
+  background: white; border-radius: 50%; transition: 0.2s;
+}
+input:checked + .slider-sw { background: var(--accent); }
+input:checked + .slider-sw:before { transform: translateX(14px); }
+
+/* ============================================================
+   CONTENT AREA
+   ============================================================ */
+#content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* TABS */
+#tabs {
+  display: flex; background: var(--bg2); border-bottom: 1px solid var(--border);
+  padding: 0 16px; flex-shrink: 0; gap: 2px;
+}
+.tab {
+  padding: 12px 16px; font-size: 0.82rem; font-weight: 500; cursor: pointer;
+  border-bottom: 2px solid transparent; color: var(--text-dim); transition: all 0.15s;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* TAB PANELS */
+#panels { flex: 1; overflow: hidden; position: relative; }
+.panel { position: absolute; inset: 0; overflow-y: auto; display: none; padding: 20px; }
+.panel.active { display: block; }
+#panel-mapa { padding: 0; }
+
+/* ============================================================
+   TAB RESUMEN
+   ============================================================ */
+.section-title {
+  font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-dim); margin-bottom: 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.vuelos-grid { display: grid; gap: 16px; }
+.vuelo-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; overflow: hidden;
+}
+.vuelo-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
+}
+.vuelo-fecha { font-size: 0.9rem; font-weight: 600; }
+.vuelo-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.mini-kpi { background: var(--bg3); border-radius: 6px; padding: 8px 10px; }
+.mini-kpi-label { font-size: 0.62rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+.mini-kpi-val { font-size: 1rem; font-weight: 700; font-family: var(--mono); margin-top: 2px; }
+.canvas-container { position: relative; height: 180px; }
+
+/* Estado badge en resumen */
+.estado-badge {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px;
+  border-radius: 20px; font-size: 0.75rem; font-weight: 600;
+}
+.estado-excelente { background: rgba(26,152,80,0.2); color: var(--green); border: 1px solid rgba(26,152,80,0.4); }
+.estado-bueno     { background: rgba(254,224,79,0.2); color: #daa800; border: 1px solid rgba(254,224,79,0.4); }
+.estado-regular   { background: rgba(252,141,89,0.2); color: var(--orange); border: 1px solid rgba(252,141,89,0.4); }
+.estado-critico   { background: rgba(215,48,39,0.2); color: var(--red); border: 1px solid rgba(215,48,39,0.4); }
+
+/* Tendencia */
+.tendencia-row {
+  display: flex; gap: 12px; margin-top: 12px; padding: 12px;
+  background: var(--bg3); border-radius: var(--radius); align-items: center;
+}
+.tend-arrow { font-size: 1.4rem; }
+.tend-label { font-size: 0.8rem; font-weight: 600; }
+.tend-desc { font-size: 0.75rem; color: var(--text-dim); }
+
+/* Análisis auto */
+.analisis-box {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; margin-top: 16px;
+}
+.analisis-titulo { font-size: 0.9rem; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+.analisis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.analisis-item { background: var(--bg3); border-radius: 6px; padding: 10px 12px; }
+.analisis-item-title { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+.analisis-item-val { font-size: 0.85rem; font-weight: 600; }
+.recom-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.recom-list li { display: flex; gap: 8px; font-size: 0.8rem; padding: 6px 10px; background: var(--bg3); border-radius: 6px; }
+.recom-num { color: var(--accent); font-weight: 700; flex-shrink: 0; font-family: var(--mono); }
+
+/* ============================================================
+   TAB MAPA
+   ============================================================ */
+#mapa-container { width: 100%; height: 100%; position: relative; }
+#map { width: 100%; height: 100%; z-index: 1; }
+
+/* Controles flotantes del mapa */
+#map-controls {
+  position: absolute; top: 10px; left: 10px; z-index: 1000;
+  display: flex; flex-direction: column; gap: 8px; pointer-events: all;
+}
+.map-panel {
+  background: rgba(13,17,23,0.93); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px; backdrop-filter: blur(8px);
+  min-width: 220px;
+}
+.map-panel-title {
+  font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-dim); margin-bottom: 8px;
+}
+
+/* Selector de vuelo en mapa */
+.vuelo-selector { display: flex; flex-direction: column; gap: 4px; }
+.vuelo-opt {
+  display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 5px;
+  cursor: pointer; font-size: 0.75rem; transition: all 0.15s;
+}
+.vuelo-opt:hover, .vuelo-opt.active { border-color: var(--accent); color: var(--accent); }
+.vuelo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+
+/* Capas toggle compacto en mapa */
+.map-layers { display: flex; flex-direction: column; gap: 5px; }
+.map-layer-row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 0.75rem; gap: 8px;
+}
+.map-layer-icon { font-size: 0.9rem; }
+
+/* Info box al hover en mapa */
+#map-info {
+  position: absolute; bottom: 20px; right: 10px; z-index: 1000;
+  background: rgba(13,17,23,0.93); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px; min-width: 180px;
+  backdrop-filter: blur(8px); font-size: 0.78rem; display: none;
+}
+#map-info.visible { display: block; }
+#map-info-title { font-weight: 600; margin-bottom: 6px; color: var(--accent); }
+#map-info-rows { display: flex; flex-direction: column; gap: 4px; }
+.info-row { display: flex; justify-content: space-between; gap: 12px; }
+.info-key { color: var(--text-dim); }
+.info-val { font-family: var(--mono); font-weight: 600; }
+
+/* Leyenda mapa flotante */
+#map-legend {
+  position: absolute; bottom: 20px; left: 10px; z-index: 1000;
+  background: rgba(13,17,23,0.93); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 12px; backdrop-filter: blur(8px);
+}
+.mleg-title { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.mleg-items { display: flex; flex-direction: column; gap: 3px; }
+.mleg-item { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; }
+.mleg-swatch { width: 14px; height: 6px; border-radius: 3px; }
+.mleg-range { color: var(--text-dim); font-family: var(--mono); font-size: 0.62rem; margin-left: auto; }
+
+/* ============================================================
+   TAB ANÁLISIS
+   ============================================================ */
+.analisis-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.chart-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px;
+}
+.chart-title { font-size: 0.8rem; font-weight: 600; margin-bottom: 12px; color: var(--text-dim); }
+.chart-canvas-wrap { position: relative; height: 200px; }
+.stats-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.stats-table th { text-align: left; color: var(--text-dim); padding: 6px 10px; border-bottom: 1px solid var(--border); font-weight: 500; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.stats-table td { padding: 7px 10px; border-bottom: 1px solid rgba(48,54,61,0.5); font-family: var(--mono); }
+.stats-table tr:last-child td { border-bottom: none; }
+.stats-table td:first-child { font-family: var(--font); font-weight: 600; color: var(--accent); }
+
+/* ============================================================
+   TAB DATOS
+   ============================================================ */
+#datos-table-wrap { overflow: auto; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+.data-table th {
+  position: sticky; top: 0; background: var(--bg2); text-align: left;
+  padding: 8px 12px; border-bottom: 1px solid var(--border); font-weight: 600;
+  color: var(--text-dim); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em;
+  white-space: nowrap; z-index: 2;
+}
+.data-table td { padding: 6px 12px; border-bottom: 1px solid rgba(48,54,61,0.5); }
+.data-table tr:hover td { background: var(--bg3); }
+.data-table td.num { font-family: var(--mono); text-align: right; }
+.clase-pill {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 0.65rem; font-weight: 600; color: #fff;
+}
+.btn-download {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+  background: var(--accent); color: #000; border: none; border-radius: var(--radius);
+  font-family: var(--font); font-weight: 600; font-size: 0.82rem; cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn-download:hover { opacity: 0.85; }
+
+/* No-data state */
+.no-data {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; height: 300px; color: var(--text-dim); text-align: center;
+}
+.no-data-icon { font-size: 3rem; opacity: 0.3; }
+.no-data-title { font-size: 1rem; font-weight: 600; }
+.no-data-desc { font-size: 0.8rem; }
+
+/* Zona de carga */
+#drop-zone {
+  border: 2px dashed var(--border); border-radius: 12px; padding: 40px;
+  text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 16px;
+}
+#drop-zone:hover, #drop-zone.drag-over { border-color: var(--accent); background: rgba(0,191,255,0.05); }
+#drop-zone-icon { font-size: 2rem; margin-bottom: 8px; }
+#drop-zone-text { font-size: 0.85rem; color: var(--text-dim); }
+#drop-zone-sub { font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; }
+#file-input { display: none; }
+
+/* Loading spinner */
+.spinner {
+  width: 20px; height: 20px; border: 2px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin 0.7s linear infinite; display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Toast */
+#toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(100px);
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 10px 20px; font-size: 0.82rem; z-index: 9999;
+  transition: transform 0.3s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+#toast.success { border-color: var(--green); color: var(--green); }
+#toast.error { border-color: var(--red); color: var(--red); }
+
+/* Responsive compacto */
+@media (max-width: 900px) {
+  #sidebar { width: 220px; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- HEADER -->
+  <header id="header">
+    <div id="header-left">
+      <img id="header-logo" src="datos/logo.png" alt="TeMapeo" onerror="this.style.display='none'">
+      <div>
+        <div id="header-title">Dashboard Frutales — Abud & Cía</div>
+        <div id="header-sub">Monitoreo multiespectral · 3 vuelos · 14 cuarteles</div>
+      </div>
+    </div>
+    <div id="header-badges">
+      <span class="badge badge-green" id="badge-arboles">— árboles</span>
+      <span class="badge badge-blue" id="badge-ha">— ha</span>
+    </div>
+    <div id="header-right">
+      <button class="btn-load" onclick="document.getElementById('file-input').click()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M2 12v1.5a.5.5 0 00.5.5h11a.5.5 0 00.5-.5V12M8 2v9M5 8l3 3 3-3"/>
+        </svg>
+        Cargar datos
+      </button>
+      <input type="file" id="file-input" accept=".geojson,.json" multiple>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <div id="main">
+    <!-- SIDEBAR -->
+    <aside id="sidebar">
+      <!-- Filtros -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Filtros</div>
+
+        <div class="filter-group">
+          <div class="filter-label">Cultivo</div>
+          <select id="sel-cultivo">
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <div class="filter-label">Variedad</div>
+          <select id="sel-variedad">
+            <option value="">Todas</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <div class="filter-label">Cuartel</div>
+          <select id="sel-cuartel">
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <div class="filter-label">Vuelos</div>
+          <div class="fecha-chips" id="fecha-chips"></div>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Métricas Generales</div>
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-label">Árboles</div>
+            <div class="kpi-value blue" id="kpi-arboles">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Superficie</div>
+            <div class="kpi-value blue" id="kpi-ha">—</div>
+            <div class="kpi-sub">hectáreas</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">% Sanos</div>
+            <div class="kpi-value green" id="kpi-sanos">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Prom. Índice</div>
+            <div class="kpi-value" id="kpi-prom">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Índices -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Índice Espectral</div>
+        <div class="indice-btns" id="indice-btns"></div>
+      </div>
+
+      <!-- Capas Mapa -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Capas del Mapa</div>
+        <div class="layer-toggles">
+          <div class="layer-toggle">
+            <div class="layer-toggle-left">
+              <span class="layer-icon">🌳</span>
+              Árboles individuales
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="layer-puntos" checked onchange="actualizarCapas()">
+              <span class="slider-sw"></span>
+            </label>
+          </div>
+          <div class="layer-toggle">
+            <div class="layer-toggle-left">
+              <span class="layer-icon">📍</span>
+              Zonas de manejo
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="layer-zonas" checked onchange="actualizarCapas()">
+              <span class="slider-sw"></span>
+            </label>
+          </div>
+          <div class="layer-toggle">
+            <div class="layer-toggle-left">
+              <span class="layer-icon">⬜</span>
+              Polígonos cuarteles
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="layer-poligonos" checked onchange="actualizarCapas()">
+              <span class="slider-sw"></span>
+            </label>
+          </div>
+          <div class="layer-toggle">
+            <div class="layer-toggle-left">
+              <span class="layer-icon">🏷️</span>
+              Etiquetas cuarteles
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="layer-etiquetas" onchange="actualizarCapas()">
+              <span class="slider-sw"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leyenda -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Leyenda — 7 Clases</div>
+        <div class="legend-items" id="legend-items"></div>
+      </div>
+
+      <!-- Leyenda Zonas -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Leyenda — Zonas Manejo</div>
+        <div class="legend-items">
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#D73027"></div>
+            <span>Baja</span>
+            <span class="legend-range" id="zona-rango-baja">—</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#FEE04F"></div>
+            <span>Media</span>
+            <span class="legend-range" id="zona-rango-media">—</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#1A9850"></div>
+            <span>Alta</span>
+            <span class="legend-range" id="zona-rango-alta">—</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CONTENT -->
+    <div id="content">
+      <!-- TABS -->
+      <div id="tabs">
+        <div class="tab active" onclick="showTab('resumen')">📊 Resumen</div>
+        <div class="tab" onclick="showTab('mapa')">🗺️ Mapa</div>
+        <div class="tab" onclick="showTab('analisis')">📈 Análisis</div>
+        <div class="tab" onclick="showTab('datos')">🔍 Datos</div>
+      </div>
+
+      <!-- PANELS -->
+      <div id="panels">
+
+        <!-- PANEL RESUMEN -->
+        <div class="panel active" id="panel-resumen">
+          <div id="resumen-content">
+            <div class="no-data">
+              <div class="no-data-icon">🌳</div>
+              <div class="no-data-title">Carga los datos para comenzar</div>
+              <div class="no-data-desc">Sube tu archivo GeoJSON con los árboles individualizados</div>
+              <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+                <div id="drop-zone-icon">📂</div>
+                <div id="drop-zone-text">Haz clic o arrastra tu archivo GeoJSON aquí</div>
+                <div id="drop-zone-sub">Soporta: BD_FINAL.geojson, Zonas_Manejo.geojson, Poligonos.geojson</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL MAPA -->
+        <div class="panel" id="panel-mapa">
+          <div id="mapa-container">
+            <div id="map"></div>
+
+            <!-- Controles flotantes -->
+            <div id="map-controls">
+              <!-- Selector vuelo -->
+              <div class="map-panel" id="map-vuelo-panel" style="display:none">
+                <div class="map-panel-title">Vuelo activo</div>
+                <div class="vuelo-selector" id="map-vuelo-selector"></div>
+              </div>
+
+              <!-- Índice activo -->
+              <div class="map-panel">
+                <div class="map-panel-title">Índice visualizado</div>
+                <div id="map-indice-name" style="font-size:0.85rem;font-weight:600;color:var(--accent)">—</div>
+                <div id="map-indice-desc" style="font-size:0.7rem;color:var(--text-dim);margin-top:2px">—</div>
+              </div>
+            </div>
+
+            <!-- Leyenda flotante -->
+            <div id="map-legend">
+              <div class="mleg-title" id="mleg-title">Simbología</div>
+              <div class="mleg-items" id="mleg-items"></div>
+            </div>
+
+            <!-- Info hover -->
+            <div id="map-info">
+              <div id="map-info-title">Árbol</div>
+              <div id="map-info-rows"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL ANÁLISIS -->
+        <div class="panel" id="panel-analisis">
+          <div id="analisis-content">
+            <div class="no-data">
+              <div class="no-data-icon">📈</div>
+              <div class="no-data-title">Sin datos cargados</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL DATOS -->
+        <div class="panel" id="panel-datos">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div class="section-title" style="margin:0">Explorador de Datos</div>
+            <button class="btn-download" onclick="descargarCSV()">
+              ⬇ Descargar CSV
+            </button>
+          </div>
+          <div id="datos-table-wrap">
+            <div class="no-data">
+              <div class="no-data-icon">🔍</div>
+              <div class="no-data-title">Sin datos cargados</div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /panels -->
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<div id="toast"></div>
+
+<!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+<script>
+// ================================================================
+// CONFIGURACIÓN DE ÍNDICES Y SIMBOLOGÍA
+// ================================================================
+
+const INDICES_CONFIG = {
+  ndvi: {
+    nombre: 'NDVI',
+    nombre_completo: 'Índice Normalizado de Vegetación',
+    categoria: 'Vigor Vegetativo',
+    descripcion: 'Mide el vigor general de la vegetación. Valores >0.60 indican vegetación densa y saludable.',
+    // Rangos calibrados para NDVI en frutales (cerezos/kiwis)
+    rangos: [
+      { label: 'Muy bajo',  min: -1,   max: 0.35, color: '#D73027', clase: 1 },
+      { label: 'Bajo',      min: 0.35, max: 0.45, color: '#FC8D59', clase: 2 },
+      { label: 'Medio-bajo',min: 0.45, max: 0.55, color: '#FEE08B', clase: 3 },
+      { label: 'Medio',     min: 0.55, max: 0.62, color: '#D9EF8B', clase: 4 },
+      { label: 'Medio-alto',min: 0.62, max: 0.70, color: '#91CF60', clase: 5 },
+      { label: 'Alto',      min: 0.70, max: 0.80, color: '#1A9850', clase: 6 },
+      { label: 'Muy alto',  min: 0.80, max: 2,    color: '#006837', clase: 7 },
+    ],
+    zonas: { baja: '< 0.50', media: '0.50 – 0.62', alta: '> 0.62' }
+  },
+  osavi: {
+    nombre: 'OSAVI',
+    nombre_completo: 'Índice de Vegetación Ajustado al Suelo',
+    categoria: 'Vigor Vegetativo',
+    descripcion: 'Similar al NDVI pero minimiza influencia del suelo. Ideal para cultivos con cobertura parcial.',
+    // Rangos calibrados para OSAVI en frutales — rango real 0–0.55
+    rangos: [
+      { label: 'Muy bajo',  min: -1,   max: 0.20, color: '#D73027', clase: 1 },
+      { label: 'Bajo',      min: 0.20, max: 0.28, color: '#FC8D59', clase: 2 },
+      { label: 'Medio-bajo',min: 0.28, max: 0.35, color: '#FEE08B', clase: 3 },
+      { label: 'Medio',     min: 0.35, max: 0.42, color: '#D9EF8B', clase: 4 },
+      { label: 'Medio-alto',min: 0.42, max: 0.48, color: '#91CF60', clase: 5 },
+      { label: 'Alto',      min: 0.48, max: 0.55, color: '#1A9850', clase: 6 },
+      { label: 'Muy alto',  min: 0.55, max: 2,    color: '#006837', clase: 7 },
+    ],
+    zonas: { baja: '< 0.35', media: '0.35 – 0.48', alta: '> 0.48' }
+  },
+  ndre: {
+    nombre: 'NDRE',
+    nombre_completo: 'Índice Red Edge Normalizado',
+    categoria: 'Contenido de Clorofila',
+    descripcion: 'Altamente sensible al contenido de clorofila. En cerezos/kiwis sanos el rango normal es 0.20–0.37.',
+    // *** RANGOS CORREGIDOS para NDRE en cerezos/kiwis ***
+    // El rango real del NDRE en vegetación sana es 0.15–0.45, NO 0.10–0.70
+    rangos: [
+      { label: 'Muy bajo',  min: -1,   max: 0.10, color: '#D73027', clase: 1 },  // Crítico/muerte
+      { label: 'Bajo',      min: 0.10, max: 0.15, color: '#FC8D59', clase: 2 },  // Estrés significativo
+      { label: 'Medio-bajo',min: 0.15, max: 0.20, color: '#FEE08B', clase: 3 },  // Estrés moderado
+      { label: 'Medio',     min: 0.20, max: 0.25, color: '#D9EF8B', clase: 4 },  // Atención / normal-bajo
+      { label: 'Medio-alto',min: 0.25, max: 0.30, color: '#91CF60', clase: 5 },  // Aceptable / normal
+      { label: 'Alto',      min: 0.30, max: 0.37, color: '#1A9850', clase: 6 },  // Buen estado
+      { label: 'Muy alto',  min: 0.37, max: 2,    color: '#006837', clase: 7 },  // Excelente clorofila
+    ],
+    zonas: { baja: '< 0.20', media: '0.20 – 0.28', alta: '> 0.28' }
+  },
+  lci: {
+    nombre: 'LCI',
+    nombre_completo: 'Índice de Clorofila de Hoja',
+    categoria: 'Contenido de Clorofila',
+    descripcion: 'Estima el contenido de clorofila foliar. Correlaciona directamente con el contenido de nitrógeno.',
+    // Rangos calibrados para LCI en frutales — rango real 0.10–0.75
+    rangos: [
+      { label: 'Muy bajo',  min: -1,   max: 0.20, color: '#D73027', clase: 1 },
+      { label: 'Bajo',      min: 0.20, max: 0.30, color: '#FC8D59', clase: 2 },
+      { label: 'Medio-bajo',min: 0.30, max: 0.40, color: '#FEE08B', clase: 3 },
+      { label: 'Medio',     min: 0.40, max: 0.50, color: '#D9EF8B', clase: 4 },
+      { label: 'Medio-alto',min: 0.50, max: 0.58, color: '#91CF60', clase: 5 },
+      { label: 'Alto',      min: 0.58, max: 0.67, color: '#1A9850', clase: 6 },
+      { label: 'Muy alto',  min: 0.67, max: 2,    color: '#006837', clase: 7 },
+    ],
+    zonas: { baja: '< 0.40', media: '0.40 – 0.55', alta: '> 0.55' }
+  }
+};
+
+const COLORES_ZONAS = { 1: '#D73027', 2: '#FEE04F', 3: '#1A9850' };
+const NOMBRES_ZONAS = { 1: 'Baja', 2: 'Media', 3: 'Alta' };
+
+// ================================================================
+// ESTADO GLOBAL
+// ================================================================
+let estado = {
+  datos: null,           // GeoJSON puntos
+  poligonos: null,       // GeoJSON cuarteles
+  zonas: null,           // GeoJSON zonas de manejo
+  indiceActivo: 'ndre',
+  fechas: [],
+  fechasActivas: new Set(),
+  filtros: { cultivo: '', variedad: '', cuartel: '' },
+  // Capas Leaflet
+  capas: {
+    puntos: null,
+    zonas: null,
+    poligonos: null,
+    etiquetas: null,
+  },
+  map: null,
+  vuelo_mapa: null,      // fecha activa en el mapa
+};
+
+// ================================================================
+// INICIALIZACIÓN
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  renderLeyenda();
+  renderIndiceBtns();
+  setupFileInput();
+  setupDropZone();
+});
+
+// ================================================================
+// MAPA — Inicialización
+// ================================================================
+function initMap() {
+  estado.map = L.map('map', {
+    center: [-34.38, -71.15],  // Peumo, Región O'Higgins
+    zoom: 13,
+    zoomControl: true,
+  });
+
+  // Fondo satelital (Google)
+  L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    attribution: '© Google Satellite',
+    maxZoom: 22,
+  }).addTo(estado.map);
+
+  // Fondo alternativo híbrido
+  const hybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+    attribution: '© Google Hybrid', maxZoom: 22
+  });
+
+  // Control de capas base
+  const baseMaps = {
+    "🛰 Satelital": L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {maxZoom:22}),
+    "🗺 Híbrido": hybrid,
+    "🏔 Terreno": L.tileLayer('https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {maxZoom:22}),
+  };
+  L.control.layers(baseMaps, {}, { position: 'topright', collapsed: true }).addTo(estado.map);
+}
+
+// ================================================================
+// CARGA DE ARCHIVOS
+// ================================================================
+function setupFileInput() {
+  const input = document.getElementById('file-input');
+  input.addEventListener('change', e => {
+    Array.from(e.target.files).forEach(f => procesarArchivo(f));
+    input.value = '';
+  });
+}
+
+function setupDropZone() {
+  const dz = document.getElementById('drop-zone');
+  if (!dz) return;
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag-over');
+    Array.from(e.dataTransfer.files).forEach(f => procesarArchivo(f));
+  });
+}
+
+async function procesarArchivo(file) {
+  const nombre = file.name.toLowerCase();
+  try {
+    const texto = await file.text();
+    const geojson = JSON.parse(texto);
+
+    if (nombre.includes('zona') || nombre.includes('manejo')) {
+      estado.zonas = geojson;
+      showToast(`✅ Zonas de manejo: ${geojson.features?.length || 0} zonas`, 'success');
+    } else if (nombre.includes('poligono') || nombre.includes('cuartel')) {
+      estado.poligonos = geojson;
+      showToast(`✅ Polígonos: ${geojson.features?.length || 0} cuarteles`, 'success');
+    } else {
+      // Archivo principal de puntos
+      estado.datos = geojson;
+      showToast(`✅ Datos cargados: ${geojson.features?.length || 0} árboles`, 'success');
+    }
+
+    procesarDatos();
+  } catch (err) {
+    showToast(`❌ Error: ${err.message}`, 'error');
+  }
+}
+
+// ================================================================
+// PROCESAMIENTO DE DATOS
+// ================================================================
+function procesarDatos() {
+  if (!estado.datos) return;
+  const features = estado.datos.features || [];
+
+  // Detectar índices disponibles
+  const indicePosibles = ['ndvi', 'osavi', 'ndre', 'lci'];
+  if (features.length > 0) {
+    const props = features[0].properties || {};
+    const disponibles = indicePosibles.filter(i => i in props || (i + '_clase') in props);
+    if (disponibles.length > 0 && !disponibles.includes(estado.indiceActivo)) {
+      estado.indiceActivo = disponibles[0];
+    }
+  }
+
+  // Detectar fechas
+  const fechasSet = new Set();
+  features.forEach(f => {
+    const fv = f.properties?.fecha_vuelo;
+    if (fv) fechasSet.add(String(fv));
+  });
+  estado.fechas = [...fechasSet].sort();
+  estado.fechasActivas = new Set(estado.fechas);
+
+  // Detectar filtros disponibles
+  poblarSelectores(features);
+
+  // Renderizar todo
+  renderFechaChips();
+  renderIndiceBtns();
+  renderLeyenda();
+  actualizarVistas();
+}
+
+function getFeaturesFiltrados() {
+  if (!estado.datos) return [];
+  return (estado.datos.features || []).filter(f => {
+    const p = f.properties || {};
+    if (estado.filtros.cultivo && String(p.cultivo || p.Cultivo || '').toLowerCase() !== estado.filtros.cultivo.toLowerCase()) return false;
+    if (estado.filtros.variedad && String(p.Variedad || p.variedad || '') !== estado.filtros.variedad) return false;
+    if (estado.filtros.cuartel && String(p.Cuartel || p.cuartel || '') !== estado.filtros.cuartel) return false;
+    if (estado.fechasActivas.size > 0 && !estado.fechasActivas.has(String(p.fecha_vuelo))) return false;
+    return true;
+  });
+}
+
+function poblarSelectores(features) {
+  const cultivos = new Set(), variedades = new Set(), cuarteles = new Set();
+  features.forEach(f => {
+    const p = f.properties || {};
+    if (p.cultivo || p.Cultivo) cultivos.add(p.cultivo || p.Cultivo);
+    if (p.Variedad || p.variedad) variedades.add(p.Variedad || p.variedad);
+    if (p.Cuartel || p.cuartel) cuarteles.add(p.Cuartel || p.cuartel);
+  });
+  poblarSelect('sel-cultivo', cultivos);
+  poblarSelect('sel-variedad', variedades);
+  poblarSelect('sel-cuartel', cuarteles);
+
+  ['sel-cultivo', 'sel-variedad', 'sel-cuartel'].forEach(id => {
+    const el = document.getElementById(id);
+    el.onchange = () => {
+      if (id === 'sel-cultivo') estado.filtros.cultivo = el.value;
+      if (id === 'sel-variedad') estado.filtros.variedad = el.value;
+      if (id === 'sel-cuartel') estado.filtros.cuartel = el.value;
+      actualizarVistas();
+    };
+  });
+}
+
+function poblarSelect(id, values) {
+  const sel = document.getElementById(id);
+  const def = sel.options[0].text;
+  sel.innerHTML = `<option value="">${def}</option>`;
+  [...values].sort().forEach(v => {
+    sel.innerHTML += `<option value="${v}">${v}</option>`;
+  });
+}
+
+// ================================================================
+// CLASIFICACIÓN SEGÚN ÍNDICE ACTIVO
+// ================================================================
+function clasificarValor(valor, indice) {
+  if (valor === null || valor === undefined || isNaN(valor)) return null;
+  const rangos = INDICES_CONFIG[indice]?.rangos || [];
+  for (const r of rangos) {
+    if (valor >= r.min && valor < r.max) return r;
+  }
+  return rangos[rangos.length - 1] || null;
+}
+
+function getValorIndice(props, indice) {
+  return props[indice] !== undefined ? parseFloat(props[indice]) : null;
+}
+
+function esSano(props, indice) {
+  const v = getValorIndice(props, indice);
+  if (v === null) return false;
+  const r = clasificarValor(v, indice);
+  return r && r.clase >= 5;
+}
+
+// ================================================================
+// RENDER COMPONENTES SIDEBAR
+// ================================================================
+function renderFechaChips() {
+  const cont = document.getElementById('fecha-chips');
+  cont.innerHTML = '';
+  estado.fechas.forEach(f => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (estado.fechasActivas.has(f) ? ' active' : '');
+    chip.textContent = f;
+    chip.onclick = () => {
+      if (estado.fechasActivas.has(f)) {
+        if (estado.fechasActivas.size > 1) estado.fechasActivas.delete(f);
+      } else {
+        estado.fechasActivas.add(f);
+      }
+      renderFechaChips();
+      actualizarVistas();
+    };
+    cont.appendChild(chip);
+  });
+}
+
+function renderIndiceBtns() {
+  const cont = document.getElementById('indice-btns');
+  if (!cont) return;
+  cont.innerHTML = '';
+  Object.entries(INDICES_CONFIG).forEach(([k, cfg]) => {
+    const features = getFeaturesFiltrados();
+    let avg = '—';
+    if (features.length > 0) {
+      const vals = features.map(f => getValorIndice(f.properties, k)).filter(v => v !== null);
+      if (vals.length > 0) avg = (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(3);
+    }
+    const btn = document.createElement('div');
+    btn.className = 'indice-btn' + (estado.indiceActivo === k ? ' active' : '');
+    btn.innerHTML = `
+      <div>
+        <div class="indice-btn-name">${cfg.nombre}</div>
+        <div class="indice-btn-cat">${cfg.categoria}</div>
+      </div>
+      <div class="indice-btn-avg">${avg}</div>`;
+    btn.onclick = () => {
+      estado.indiceActivo = k;
+      renderIndiceBtns();
+      renderLeyenda();
+      actualizarVistas();
+    };
+    cont.appendChild(btn);
+  });
+}
+
+function renderLeyenda() {
+  const cfg = INDICES_CONFIG[estado.indiceActivo];
+  if (!cfg) return;
+
+  // Sidebar legend
+  const cont = document.getElementById('legend-items');
+  if (cont) {
+    cont.innerHTML = '';
+    cfg.rangos.forEach(r => {
+      const rangeStr = r.min <= -1
+        ? `< ${r.max}`
+        : r.max >= 2
+          ? `≥ ${r.min}`
+          : `${r.min}–${r.max}`;
+      cont.innerHTML += `
+        <div class="legend-item">
+          <div class="legend-dot" style="background:${r.color}"></div>
+          <span>${r.label}</span>
+          <span class="legend-range">${rangeStr}</span>
+        </div>`;
+    });
+  }
+
+  // Zonas leyenda
+  const z = cfg.zonas;
+  if (z) {
+    document.getElementById('zona-rango-baja').textContent = z.baja;
+    document.getElementById('zona-rango-media').textContent = z.media;
+    document.getElementById('zona-rango-alta').textContent = z.alta;
+  }
+
+  // Mapa legend
+  const mlegItems = document.getElementById('mleg-items');
+  const mlegTitle = document.getElementById('mleg-title');
+  if (mlegItems) {
+    mlegTitle.textContent = cfg.nombre;
+    mlegItems.innerHTML = '';
+    cfg.rangos.forEach(r => {
+      const rangeStr = r.min <= -1 ? `< ${r.max}` : r.max >= 2 ? `≥ ${r.min}` : `${r.min}–${r.max}`;
+      mlegItems.innerHTML += `
+        <div class="mleg-item">
+          <div class="mleg-swatch" style="background:${r.color}"></div>
+          <span>${r.label}</span>
+          <span class="mleg-range">${rangeStr}</span>
+        </div>`;
+    });
+  }
+
+  // Info panel
+  const mapIndiceName = document.getElementById('map-indice-name');
+  const mapIndiceDesc = document.getElementById('map-indice-desc');
+  if (mapIndiceName) { mapIndiceName.textContent = cfg.nombre_completo; mapIndiceDesc.textContent = cfg.descripcion; }
+}
+
+// ================================================================
+// ACTUALIZAR TODAS LAS VISTAS
+// ================================================================
+function actualizarVistas() {
+  actualizarKPIs();
+  renderIndiceBtns();
+
+  const tabActiva = document.querySelector('.panel.active');
+  if (tabActiva) {
+    const id = tabActiva.id;
+    if (id === 'panel-resumen') renderResumen();
+    if (id === 'panel-mapa')    renderMapa();
+    if (id === 'panel-analisis') renderAnalisis();
+    if (id === 'panel-datos')   renderDatos();
+  }
+}
+
+function actualizarKPIs() {
+  const features = getFeaturesFiltrados();
+  const n = features.length;
+  const indice = estado.indiceActivo;
+
+  document.getElementById('kpi-arboles').textContent = n > 0 ? n.toLocaleString('es-CL') : '—';
+  document.getElementById('badge-arboles').textContent = n > 0 ? `${n.toLocaleString('es-CL')} árboles` : '— árboles';
+
+  if (n === 0) {
+    document.getElementById('kpi-sanos').textContent = '—';
+    document.getElementById('kpi-prom').textContent = '—';
+    document.getElementById('kpi-ha').textContent = '—';
+    return;
+  }
+
+  const sanos = features.filter(f => esSano(f.properties, indice)).length;
+  const pctSanos = (sanos / n * 100).toFixed(1);
+
+  const vals = features.map(f => getValorIndice(f.properties, indice)).filter(v => v !== null);
+  const prom = vals.length > 0 ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(3) : '—';
+
+  document.getElementById('kpi-sanos').textContent = `${pctSanos}%`;
+  document.getElementById('kpi-prom').textContent = prom;
+
+  // Superficie desde polígonos
+  if (estado.poligonos) {
+    const cuartelesEnDatos = new Set(features.map(f => f.properties?.Cuartel || f.properties?.cuartel));
+    const haTotal = (estado.poligonos.features || [])
+      .filter(f => cuartelesEnDatos.has(f.properties?.Cuartel || f.properties?.cuartel))
+      .reduce((acc, f) => acc + (parseFloat(f.properties?.Superficie_ha || f.properties?.area_ha || 0)), 0);
+    document.getElementById('kpi-ha').textContent = haTotal > 0 ? haTotal.toFixed(1) : '—';
+    document.getElementById('badge-ha').textContent = haTotal > 0 ? `${haTotal.toFixed(1)} ha` : '— ha';
+  }
+}
+
+// ================================================================
+// TAB: RESUMEN
+// ================================================================
+function renderResumen() {
+  const features = getFeaturesFiltrados();
+  const indice = estado.indiceActivo;
+  const cfg = INDICES_CONFIG[indice];
+  const cont = document.getElementById('resumen-content');
+
+  if (features.length === 0) {
+    cont.innerHTML = `<div class="no-data">
+      <div class="no-data-icon">🌳</div>
+      <div class="no-data-title">Carga los datos para comenzar</div>
+      <div class="no-data-desc">Sube tu archivo GeoJSON con los árboles individualizados</div>
+      <div id="drop-zone" onclick="document.getElementById('file-input').click()" style="cursor:pointer;border:2px dashed var(--border);border-radius:12px;padding:30px;text-align:center;margin-top:16px">
+        <div style="font-size:2rem;margin-bottom:8px">📂</div>
+        <div style="color:var(--text-dim);font-size:0.85rem">Haz clic para cargar GeoJSON</div>
+        <div style="color:var(--text-dim);font-size:0.72rem;margin-top:4px">BD_FINAL.geojson · Zonas_Manejo.geojson · Poligonos.geojson</div>
+      </div>
+    </div>`;
+    setupDropZone();
+    return;
+  }
+
+  // Agrupar por fecha
+  const fechasActivas = [...estado.fechasActivas].sort();
+
+  let html = `<div class="section-title">📊 Comparación por vuelo — ${cfg.nombre}</div>`;
+
+  // Info del índice
+  html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px;font-size:0.8rem;color:var(--text-dim)">
+    <strong style="color:var(--text)">${cfg.nombre_completo}</strong> · ${cfg.categoria}<br>
+    ${cfg.descripcion}
+  </div>`;
+
+  // Grid de vuelos
+  html += `<div class="vuelos-grid" style="grid-template-columns:repeat(${Math.min(fechasActivas.length,3)},1fr)">`;
+
+  const chartIds = [];
+  fechasActivas.forEach((fecha, i) => {
+    const fFeatures = features.filter(f => String(f.properties?.fecha_vuelo) === fecha);
+    const n = fFeatures.length;
+    const vals = fFeatures.map(f => getValorIndice(f.properties, indice)).filter(v => v !== null);
+    const prom = vals.length > 0 ? (vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
+    const std = vals.length > 1 ? Math.sqrt(vals.reduce((a,v)=>(a+(v-prom)**2),0)/(vals.length-1)) : 0;
+    const sanos = fFeatures.filter(f => esSano(f.properties, indice)).length;
+    const pctSanos = n > 0 ? (sanos/n*100) : 0;
+
+    // Distribución por clase
+    const distrib = {};
+    cfg.rangos.forEach(r => distrib[r.label] = 0);
+    fFeatures.forEach(f => {
+      const v = getValorIndice(f.properties, indice);
+      if (v !== null) {
+        const r = clasificarValor(v, indice);
+        if (r) distrib[r.label] = (distrib[r.label] || 0) + 1;
+      }
+    });
+
+    const estadoBadge = pctSanos >= 80 ? 'excelente' : pctSanos >= 60 ? 'bueno' : pctSanos >= 40 ? 'regular' : 'critico';
+    const estadoLabel = { excelente: '🟢 EXCELENTE', bueno: '🟡 BUENO', regular: '🟠 REGULAR', critico: '🔴 CRÍTICO' }[estadoBadge];
+
+    const chartId = `chart-vuelo-${i}`;
+    chartIds.push({ id: chartId, distrib, colors: cfg.rangos.map(r=>r.color) });
+
+    html += `
+    <div class="vuelo-card">
+      <div class="vuelo-header">
+        <span class="vuelo-fecha">📅 ${fecha}</span>
+        <span class="estado-badge estado-${estadoBadge}">${estadoLabel}</span>
+      </div>
+      <div class="vuelo-kpis">
+        <div class="mini-kpi">
+          <div class="mini-kpi-label">Árboles</div>
+          <div class="mini-kpi-val" style="color:var(--accent)">${n.toLocaleString('es-CL')}</div>
+        </div>
+        <div class="mini-kpi">
+          <div class="mini-kpi-label">${indice.toUpperCase()} μ</div>
+          <div class="mini-kpi-val">${prom.toFixed(3)}</div>
+        </div>
+        <div class="mini-kpi">
+          <div class="mini-kpi-label">% Sanos</div>
+          <div class="mini-kpi-val" style="color:var(--green)">${pctSanos.toFixed(1)}%</div>
+        </div>
+        <div class="mini-kpi">
+          <div class="mini-kpi-label">σ</div>
+          <div class="mini-kpi-val">${std.toFixed(3)}</div>
+        </div>
+      </div>
+      <div class="canvas-container">
+        <canvas id="${chartId}"></canvas>
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Tendencia entre vuelos
+  if (fechasActivas.length >= 2) {
+    const promsVuelos = fechasActivas.map(fecha => {
+      const fFeats = features.filter(f => String(f.properties?.fecha_vuelo) === fecha);
+      const vals = fFeats.map(f => getValorIndice(f.properties, indice)).filter(v => v !== null);
+      return vals.length > 0 ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+    });
+    const delta = promsVuelos[promsVuelos.length-1] - promsVuelos[0];
+    const arrow = delta > 0.01 ? '📈' : delta < -0.01 ? '📉' : '➡️';
+    const tendLabel = delta > 0.01 ? 'Tendencia positiva' : delta < -0.01 ? 'Tendencia negativa' : 'Tendencia estable';
+    const tendDesc = `${indice.toUpperCase()} pasó de ${promsVuelos[0].toFixed(3)} a ${promsVuelos[promsVuelos.length-1].toFixed(3)} (Δ${delta>0?'+':''}${delta.toFixed(3)})`;
+
+    html += `
+    <div class="tendencia-row">
+      <div class="tend-arrow">${arrow}</div>
+      <div>
+        <div class="tend-label">${tendLabel}</div>
+        <div class="tend-desc">${tendDesc}</div>
+      </div>
+    </div>`;
+  }
+
+  // Análisis automático
+  html += generarAnalisisHTML(features, indice);
+
+  cont.innerHTML = html;
+
+  // Crear charts
+  chartIds.forEach(({ id, distrib, colors }) => {
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(distrib),
+        datasets: [{
+          data: Object.values(distrib),
+          backgroundColor: colors,
+          borderRadius: 4,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            ticks: { color: '#8b949e', font: { size: 9 }, maxRotation: 40 },
+            grid: { color: 'rgba(48,54,61,0.4)' }
+          },
+          y: {
+            ticks: { color: '#8b949e', font: { size: 9 } },
+            grid: { color: 'rgba(48,54,61,0.4)' }
+          }
+        }
+      }
+    });
+  });
+}
+
+function generarAnalisisHTML(features, indice) {
+  const cfg = INDICES_CONFIG[indice];
+  const n = features.length;
+  if (n === 0) return '';
+
+  const vals = features.map(f => getValorIndice(f.properties, indice)).filter(v => v !== null);
+  const prom = vals.reduce((a,b)=>a+b,0)/vals.length;
+  const std = vals.length > 1 ? Math.sqrt(vals.reduce((a,v)=>(a+(v-prom)**2),0)/(vals.length-1)) : 0;
+  const cv = prom > 0 ? (std/prom*100) : 0;
+  const sanos = features.filter(f => esSano(f.properties, indice)).length;
+  const pctSanos = (sanos/n*100);
+
+  // Diagnóstico
+  const diag = [];
+  const recoms = [];
+
+  if (pctSanos >= 80) diag.push(`✅ ${pctSanos.toFixed(1)}% de los árboles presenta condiciones óptimas.`);
+  else if (pctSanos >= 60) diag.push(`🟡 ${pctSanos.toFixed(1)}% de los árboles en buen estado, hay margen de mejora.`);
+  else if (pctSanos >= 40) diag.push(`🟠 Solo ${pctSanos.toFixed(1)}% en condiciones óptimas. Se requiere atención.`);
+  else diag.push(`🔴 Apenas ${pctSanos.toFixed(1)}% presenta buen estado. Intervención urgente.`);
+
+  if (cv < 10) diag.push(`Alta homogeneidad (CV=${cv.toFixed(1)}%), manejo uniforme.`);
+  else if (cv < 20) diag.push(`Variabilidad moderada (CV=${cv.toFixed(1)}%), normal para frutales.`);
+  else { diag.push(`⚠️ Alta variabilidad espacial (CV=${cv.toFixed(1)}%), condiciones heterogéneas.`); recoms.push('Investigar causas de variabilidad: riego, suelo, plagas o enfermedades focalizadas.'); }
+
+  if (indice === 'ndre' && prom < 0.20) recoms.push('NDRE bajo indica posible deficiencia de clorofila. Evaluar fertilización nitrogenada.');
+  if (indice === 'ndvi' && prom < 0.50) recoms.push('NDVI bajo sugiere estrés general. Verificar riego y estado nutricional.');
+  if (indice === 'lci' && prom < 0.40) recoms.push('LCI bajo sugiere contenido de clorofila subóptimo. Considerar aplicación foliar.');
+
+  let html = `
+  <div class="analisis-box">
+    <div class="analisis-titulo">🔬 Análisis Automático — ${cfg.nombre}</div>
+    <div class="analisis-grid" style="margin-bottom:12px">
+      <div class="analisis-item"><div class="analisis-item-title">Árboles analizados</div><div class="analisis-item-val">${n.toLocaleString('es-CL')}</div></div>
+      <div class="analisis-item"><div class="analisis-item-title">${indice.toUpperCase()} promedio</div><div class="analisis-item-val" style="color:var(--accent)">${prom.toFixed(3)}</div></div>
+      <div class="analisis-item"><div class="analisis-item-title">Desv. estándar</div><div class="analisis-item-val">${std.toFixed(3)}</div></div>
+      <div class="analisis-item"><div class="analisis-item-title">% Sanos (≥ Medio-alto)</div><div class="analisis-item-val" style="color:var(--green)">${pctSanos.toFixed(1)}%</div></div>
+    </div>
+    <div style="font-size:0.8rem;margin-bottom:8px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.06em">Diagnóstico</div>
+    ${diag.map(d => `<div style="font-size:0.8rem;padding:5px 0;border-bottom:1px solid rgba(48,54,61,0.5)">${d}</div>`).join('')}`;
+
+  if (recoms.length > 0) {
+    html += `<div style="font-size:0.8rem;margin:10px 0 6px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.06em">💡 Recomendaciones</div>
+    <ul class="recom-list">
+    ${recoms.map((r,i) => `<li><span class="recom-num">${i+1}.</span>${r}</li>`).join('')}
+    </ul>`;
+  }
+
+  html += `<div style="font-size:0.65rem;color:var(--text-dim);margin-top:10px;text-align:right">
+    Análisis generado por TeMapeo Viewer v10.0 · ${n.toLocaleString('es-CL')} observaciones
+  </div></div>`;
+
+  return html;
+}
+
+// ================================================================
+// TAB: MAPA — Con capas interactivas
+// ================================================================
+function renderMapa() {
+  if (!estado.datos) return;
+
+  // Limpiar capas anteriores
+  ['puntos', 'zonas', 'poligonos', 'etiquetas'].forEach(k => {
+    if (estado.capas[k]) { estado.map.removeLayer(estado.capas[k]); estado.capas[k] = null; }
+  });
+
+  // Actualizar selector de vuelo en mapa
+  renderMapaVueloSelector();
+
+  const vuelo = estado.vuelo_mapa || [...estado.fechasActivas][0];
+  const features = getFeaturesFiltrados().filter(f => String(f.properties?.fecha_vuelo) === vuelo);
+
+  // 1. Polígonos cuarteles
+  if (estado.poligonos) {
+    const cuartelesActivos = new Set(features.map(f => f.properties?.Cuartel || f.properties?.cuartel));
+    const gjFiltrado = {
+      type: 'FeatureCollection',
+      features: (estado.poligonos.features || []).filter(f =>
+        cuartelesActivos.has(f.properties?.Cuartel || f.properties?.cuartel)
+      )
+    };
+    estado.capas.poligonos = L.geoJSON(gjFiltrado, {
+      style: () => ({
+        color: '#00BFFF', weight: 2.5, opacity: 0.9, fillOpacity: 0, dashArray: null
+      }),
+      onEachFeature: (feature, layer) => {
+        const p = feature.properties || {};
+        const nombre = p.Cuartel || p.cuartel || '—';
+        const ha = parseFloat(p.Superficie_ha || p.area_ha || 0).toFixed(2);
+        layer.bindTooltip(`<strong>${nombre}</strong><br>${ha} ha`, { sticky: true });
+      }
+    }).addTo(estado.map);
+
+    // Etiquetas cuarteles (como markers de texto)
+    const etGroup = L.layerGroup();
+    gjFiltrado.features.forEach(f => {
+      try {
+        const center = L.geoJSON(f).getBounds().getCenter();
+        const nombre = f.properties?.Cuartel || f.properties?.cuartel || '';
+        const icon = L.divIcon({
+          className: '',
+          html: `<div style="font-size:10px;font-weight:700;color:#00BFFF;text-shadow:0 0 3px #000,0 0 3px #000;white-space:nowrap">${nombre}</div>`,
+          iconAnchor: [0, 0]
+        });
+        L.marker(center, { icon }).addTo(etGroup);
+      } catch(e) {}
+    });
+    estado.capas.etiquetas = etGroup;
+    if (document.getElementById('layer-etiquetas').checked) etGroup.addTo(estado.map);
+  }
+
+  // 2. Zonas de manejo
+  if (estado.zonas) {
+    const indice = estado.indiceActivo;
+    const zonasFiltradas = (estado.zonas.features || []).filter(f => {
+      const p = f.properties || {};
+      if (p.indice && p.indice !== indice) return false;
+      if (p.fecha_vuelo && String(p.fecha_vuelo) !== vuelo) return false;
+      return true;
+    });
+
+    const colorZona = f => {
+      const clase = f.properties?.clase || f.properties?.Clase || 1;
+      return COLORES_ZONAS[clase] || '#888';
+    };
+
+    estado.capas.zonas = L.geoJSON({ type:'FeatureCollection', features:zonasFiltradas }, {
+      style: f => {
+        const col = colorZona(f);
+        const clase = f.properties?.clase || 1;
+        const opacidad = clase === 1 ? 0.75 : clase === 2 ? 0.65 : 0.55;
+        return { color: col, weight: 1, fillColor: col, fillOpacity: opacidad };
+      },
+      onEachFeature: (feature, layer) => {
+        const p = feature.properties || {};
+        const clase = p.clase || 1;
+        const nombre = NOMBRES_ZONAS[clase] || '—';
+        const ha = parseFloat(p.area_ha || 0).toFixed(2);
+        const pct = parseFloat(p.pct_area || 0).toFixed(1);
+        const cfg = INDICES_CONFIG[indice];
+        const rango = clase === 1 ? cfg?.zonas?.baja : clase === 2 ? cfg?.zonas?.media : cfg?.zonas?.alta;
+        layer.bindTooltip(`
+          <strong>Zona ${nombre}</strong><br>
+          ${indice.toUpperCase()}: ${rango || '—'}<br>
+          Cuartel: ${p.cuartel || '—'}<br>
+          ${ha} ha (${pct}%)
+        `, { sticky: true });
+      }
+    }).addTo(estado.map);
+  }
+
+  // 3. Puntos individuales
+  const indice = estado.indiceActivo;
+  const geojsonPuntos = { type: 'FeatureCollection', features };
+
+  estado.capas.puntos = L.geoJSON(geojsonPuntos, {
+    pointToLayer: (feature, latlng) => {
+      const p = feature.properties || {};
+      const v = getValorIndice(p, indice);
+      const r = v !== null ? clasificarValor(v, indice) : null;
+      const color = r ? r.color : '#888';
+      return L.circleMarker(latlng, {
+        radius: 4, fillColor: color, color: 'transparent',
+        fillOpacity: 0.88, weight: 0
+      });
+    },
+    onEachFeature: (feature, layer) => {
+      const p = feature.properties || {};
+      const v = getValorIndice(p, indice);
+      const r = v !== null ? clasificarValor(v, indice) : null;
+      layer.on('mouseover', () => {
+        const info = document.getElementById('map-info');
+        const rows = document.getElementById('map-info-rows');
+        info.classList.add('visible');
+        document.getElementById('map-info-title').textContent = `Árbol ${p.id || '—'}`;
+        rows.innerHTML = `
+          <div class="info-row"><span class="info-key">Cuartel</span><span class="info-val">${p.Cuartel || p.cuartel || '—'}</span></div>
+          <div class="info-row"><span class="info-key">Especie</span><span class="info-val">${p.Especie || p.especie || '—'}</span></div>
+          <div class="info-row"><span class="info-key">Variedad</span><span class="info-val">${p.Variedad || p.variedad || '—'}</span></div>
+          <div class="info-row"><span class="info-key">${indice.toUpperCase()}</span><span class="info-val" style="color:${r?.color||'white'}">${v !== null ? v.toFixed(3) : '—'}</span></div>
+          <div class="info-row"><span class="info-key">Clase</span><span class="info-val">${r?.label || '—'}</span></div>
+          ${p.altura_m !== undefined ? `<div class="info-row"><span class="info-key">Altura</span><span class="info-val">${parseFloat(p.altura_m).toFixed(2)} m</span></div>` : ''}
+        `;
+      });
+      layer.on('mouseout', () => document.getElementById('map-info').classList.remove('visible'));
+    }
+  });
+  if (document.getElementById('layer-puntos').checked) estado.capas.puntos.addTo(estado.map);
+
+  // Ajustar vista
+  if (features.length > 0) {
+    try {
+      const bounds = estado.capas.puntos.getBounds();
+      if (bounds.isValid()) estado.map.fitBounds(bounds, { padding: [30, 30] });
+    } catch(e) {}
+  }
+
+  // Aplicar visibilidad según toggles
+  actualizarCapas();
+}
+
+function renderMapaVueloSelector() {
+  const cont = document.getElementById('map-vuelo-selector');
+  const panel = document.getElementById('map-vuelo-panel');
+  if (!cont) return;
+  cont.innerHTML = '';
+  const fechas = [...estado.fechasActivas].sort();
+  if (fechas.length <= 1) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+
+  if (!estado.vuelo_mapa || !fechas.includes(estado.vuelo_mapa)) {
+    estado.vuelo_mapa = fechas[0];
+  }
+
+  fechas.forEach(f => {
+    const div = document.createElement('div');
+    div.className = 'vuelo-opt' + (f === estado.vuelo_mapa ? ' active' : '');
+    div.innerHTML = `<div class="vuelo-dot"></div>${f}`;
+    div.onclick = () => {
+      estado.vuelo_mapa = f;
+      renderMapa();
+    };
+    cont.appendChild(div);
+  });
+}
+
+function actualizarCapas() {
+  const map = estado.map;
+  if (!map) return;
+
+  const mostrarPuntos   = document.getElementById('layer-puntos')?.checked;
+  const mostrarZonas    = document.getElementById('layer-zonas')?.checked;
+  const mostrarPoligonos= document.getElementById('layer-poligonos')?.checked;
+  const mostrarEtiquetas= document.getElementById('layer-etiquetas')?.checked;
+
+  if (estado.capas.puntos) {
+    if (mostrarPuntos) { if (!map.hasLayer(estado.capas.puntos)) estado.capas.puntos.addTo(map); }
+    else map.removeLayer(estado.capas.puntos);
+  }
+  if (estado.capas.zonas) {
+    if (mostrarZonas) { if (!map.hasLayer(estado.capas.zonas)) estado.capas.zonas.addTo(map); }
+    else map.removeLayer(estado.capas.zonas);
+  }
+  if (estado.capas.poligonos) {
+    if (mostrarPoligonos) { if (!map.hasLayer(estado.capas.poligonos)) estado.capas.poligonos.addTo(map); }
+    else map.removeLayer(estado.capas.poligonos);
+  }
+  if (estado.capas.etiquetas) {
+    if (mostrarEtiquetas) { if (!map.hasLayer(estado.capas.etiquetas)) estado.capas.etiquetas.addTo(map); }
+    else map.removeLayer(estado.capas.etiquetas);
+  }
+}
+
+// ================================================================
+// TAB: ANÁLISIS
+// ================================================================
+function renderAnalisis() {
+  const features = getFeaturesFiltrados();
+  const indice = estado.indiceActivo;
+  const cfg = INDICES_CONFIG[indice];
+  const cont = document.getElementById('analisis-content');
+
+  if (features.length === 0) {
+    cont.innerHTML = `<div class="no-data"><div class="no-data-icon">📈</div><div class="no-data-title">Sin datos cargados</div></div>`;
+    return;
+  }
+
+  const fechas = [...estado.fechasActivas].sort();
+
+  // Estadísticas por vuelo
+  const statsPorFecha = fechas.map(fecha => {
+    const ff = features.filter(f => String(f.properties?.fecha_vuelo) === fecha);
+    const vals = ff.map(f => getValorIndice(f.properties, indice)).filter(v => v !== null);
+    const n = ff.length;
+    const prom = vals.length > 0 ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+    const std = vals.length > 1 ? Math.sqrt(vals.reduce((a,v)=>(a+(v-prom)**2),0)/(vals.length-1)) : 0;
+    const sanos = ff.filter(f => esSano(f.properties, indice)).length;
+    return { fecha, n, min: Math.min(...vals), max: Math.max(...vals), prom, std, pctSanos: n>0?sanos/n*100:0 };
+  });
+
+  // Distribución global
+  const distribGlobal = {};
+  cfg.rangos.forEach(r => distribGlobal[r.label] = 0);
+  features.forEach(f => {
+    const v = getValorIndice(f.properties, indice);
+    if (v !== null) {
+      const r = clasificarValor(v, indice);
+      if (r) distribGlobal[r.label] = (distribGlobal[r.label] || 0) + 1;
+    }
+  });
+
+  let html = `
+  <div style="margin-bottom:12px">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:0.78rem;color:var(--text-dim)">
+      <strong style="color:var(--text)">${cfg.nombre_completo}</strong> · ${cfg.descripcion}
+    </div>
+  </div>
+  <div class="analisis-layout">`;
+
+  // Gráfico distribución global
+  html += `
+  <div class="chart-card">
+    <div class="chart-title">Distribución Global — ${cfg.nombre}</div>
+    <div class="chart-canvas-wrap"><canvas id="chart-distrib-global"></canvas></div>
+  </div>`;
+
+  // Evolución temporal (si hay múltiples vuelos)
+  html += `
+  <div class="chart-card">
+    <div class="chart-title">Evolución Temporal — Promedio ${cfg.nombre}</div>
+    <div class="chart-canvas-wrap"><canvas id="chart-evolucion"></canvas></div>
+  </div>`;
+
+  // Boxplot comparativo (simulado con min/Q1/med/Q3/max)
+  html += `
+  <div class="chart-card">
+    <div class="chart-title">Comparación % Árboles Sanos por Vuelo</div>
+    <div class="chart-canvas-wrap"><canvas id="chart-sanos-vuelo"></canvas></div>
+  </div>`;
+
+  // Tabla estadísticas
+  html += `
+  <div class="chart-card">
+    <div class="chart-title">Estadísticas Descriptivas</div>
+    <table class="stats-table">
+      <thead><tr>
+        <th>Fecha</th><th>N</th><th>Media</th><th>Std</th><th>Min</th><th>Max</th><th>% Sanos</th>
+      </tr></thead>
+      <tbody>
+        ${statsPorFecha.map(s => `
+        <tr>
+          <td>${s.fecha}</td>
+          <td>${s.n.toLocaleString('es-CL')}</td>
+          <td>${s.prom.toFixed(3)}</td>
+          <td>${s.std.toFixed(3)}</td>
+          <td>${isFinite(s.min)?s.min.toFixed(3):'—'}</td>
+          <td>${isFinite(s.max)?s.max.toFixed(3):'—'}</td>
+          <td style="color:var(--green)">${s.pctSanos.toFixed(1)}%</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+
+  html += `</div>`;
+  cont.innerHTML = html;
+
+  // Charts
+  new Chart(document.getElementById('chart-distrib-global'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(distribGlobal),
+      datasets: [{
+        data: Object.values(distribGlobal),
+        backgroundColor: cfg.rangos.map(r => r.color),
+        borderRadius: 5, borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b949e', font:{size:9}, maxRotation:35 }, grid: { color: 'rgba(48,54,61,0.4)' } },
+        y: { ticks: { color: '#8b949e', font:{size:9} }, grid: { color: 'rgba(48,54,61,0.4)' } }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('chart-evolucion'), {
+    type: 'line',
+    data: {
+      labels: statsPorFecha.map(s => s.fecha),
+      datasets: [{
+        label: `${cfg.nombre} μ`,
+        data: statsPorFecha.map(s => s.prom),
+        borderColor: '#00BFFF', backgroundColor: 'rgba(0,191,255,0.1)',
+        pointRadius: 6, pointBackgroundColor: '#00BFFF',
+        tension: 0.3, fill: true
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { type:'category', ticks: { color: '#8b949e', font:{size:9} }, grid: { color: 'rgba(48,54,61,0.4)' } },
+        y: { ticks: { color: '#8b949e', font:{size:9} }, grid: { color: 'rgba(48,54,61,0.4)' } }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('chart-sanos-vuelo'), {
+    type: 'bar',
+    data: {
+      labels: statsPorFecha.map(s => s.fecha),
+      datasets: [{
+        label: '% Sanos',
+        data: statsPorFecha.map(s => s.pctSanos),
+        backgroundColor: statsPorFecha.map(s => s.pctSanos >= 60 ? 'rgba(26,152,80,0.8)' : 'rgba(215,48,39,0.8)'),
+        borderRadius: 5, borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { type:'category', ticks: { color: '#8b949e', font:{size:9} }, grid: { color: 'rgba(48,54,61,0.4)' } },
+        y: { min:0, max:100, ticks: { color: '#8b949e', font:{size:9}, callback: v => v+'%' }, grid: { color: 'rgba(48,54,61,0.4)' } }
+      }
+    }
+  });
+}
+
+// ================================================================
+// TAB: DATOS
+// ================================================================
+function renderDatos() {
+  const features = getFeaturesFiltrados();
+  const cont = document.getElementById('datos-table-wrap');
+
+  if (features.length === 0) {
+    cont.innerHTML = `<div class="no-data"><div class="no-data-icon">🔍</div><div class="no-data-title">Sin datos cargados</div></div>`;
+    return;
+  }
+
+  const indice = estado.indiceActivo;
+  const cfg = INDICES_CONFIG[indice];
+
+  // Muestra max 500 filas
+  const sample = features.slice(0, 500);
+
+  let html = `
+  <div style="font-size:0.72rem;color:var(--text-dim);margin-bottom:8px">
+    Mostrando ${sample.length.toLocaleString('es-CL')} de ${features.length.toLocaleString('es-CL')} registros
+  </div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>ID</th><th>Cuartel</th><th>Especie</th><th>Variedad</th>
+        <th>Fecha</th>
+        ${Object.keys(INDICES_CONFIG).filter(k => k in (sample[0]?.properties||{})).map(k => `<th>${k.toUpperCase()}</th><th>Clase</th>`).join('')}
+        ${(sample[0]?.properties?.altura_m !== undefined) ? '<th>Altura (m)</th>' : ''}
+      </tr>
+    </thead>
+    <tbody>`;
+
+  sample.forEach(f => {
+    const p = f.properties || {};
+    const v = getValorIndice(p, indice);
+    const r = v !== null ? clasificarValor(v, indice) : null;
+    html += `
+    <tr>
+      <td>${p.id || '—'}</td>
+      <td>${p.Cuartel || p.cuartel || '—'}</td>
+      <td>${p.Especie || p.especie || '—'}</td>
+      <td>${p.Variedad || p.variedad || '—'}</td>
+      <td style="white-space:nowrap">${p.fecha_vuelo || '—'}</td>
+      ${Object.keys(INDICES_CONFIG).filter(k => k in p).map(k => {
+        const vk = getValorIndice(p, k);
+        const rk = vk !== null ? clasificarValor(vk, k) : null;
+        return `<td class="num">${vk !== null ? vk.toFixed(3) : '—'}</td>
+        <td><span class="clase-pill" style="background:${rk?.color||'#444'}">${rk?.label||'—'}</span></td>`;
+      }).join('')}
+      ${p.altura_m !== undefined ? `<td class="num">${parseFloat(p.altura_m).toFixed(2)}</td>` : ''}
+    </tr>`;
+  });
+
+  html += `</tbody></table>`;
+  cont.innerHTML = html;
+}
+
+function descargarCSV() {
+  const features = getFeaturesFiltrados();
+  if (features.length === 0) return;
+  const indice = estado.indiceActivo;
+
+  const headers = ['id', 'Cuartel', 'Especie', 'Variedad', 'fecha_vuelo', 'lat', 'lon', indice, `${indice}_clase`, `${indice}_clase_num`, 'altura_m'];
+  const rows = features.map(f => {
+    const p = f.properties || {};
+    const coords = f.geometry?.coordinates || [null, null];
+    const v = getValorIndice(p, indice);
+    const r = v !== null ? clasificarValor(v, indice) : null;
+    return headers.map(h => {
+      if (h === 'lon') return coords[0] ?? '';
+      if (h === 'lat') return coords[1] ?? '';
+      if (h === `${indice}_clase`) return r?.label ?? '';
+      if (h === `${indice}_clase_num`) return r?.clase ?? '';
+      return p[h] ?? '';
+    }).join(',');
+  });
+
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `TeMapeo_Abud_${indice}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ================================================================
+// NAVEGACIÓN DE TABS
+// ================================================================
+function showTab(nombre) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const nombres = ['resumen','mapa','analisis','datos'];
+    t.classList.toggle('active', nombres[i] === nombre);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${nombre}`).classList.add('active');
+
+  // Renderizar tab activo
+  if (nombre === 'resumen') renderResumen();
+  if (nombre === 'mapa') { renderMapa(); setTimeout(() => estado.map?.invalidateSize(), 100); }
+  if (nombre === 'analisis') renderAnalisis();
+  if (nombre === 'datos') renderDatos();
+}
+
+// ================================================================
+// TOAST
+// ================================================================
+function showToast(msg, tipo = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show ${tipo}`;
+  setTimeout(() => t.className = tipo, 3000);
+}
+
+// ================================================================
+// INIT LEYENDA Y BOTONES AL CARGAR
+// ================================================================
+renderLeyenda();
+renderIndiceBtns();
+</script>
+
+</body>
+</html>
