@@ -674,7 +674,6 @@ input:checked + .slider-sw:before { transform: translateX(14px); }
                   <div class="split-header">
                     <span class="split-label">PANEL A</span>
                     <select class="split-selector" id="split-left-vuelo" onchange="renderSplitMapa()"></select>
-                    <select class="split-selector" id="split-left-indice" onchange="renderSplitMapa()"></select>
                   </div>
                   <div id="split-legend-left" style="position:absolute;bottom:24px;left:8px;z-index:500;background:rgba(13,17,23,0.88);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:0.68rem;min-width:120px"></div>
                 </div>
@@ -684,7 +683,6 @@ input:checked + .slider-sw:before { transform: translateX(14px); }
                   <div class="split-header">
                     <span class="split-label">PANEL B</span>
                     <select class="split-selector" id="split-right-vuelo" onchange="renderSplitMapa()"></select>
-                    <select class="split-selector" id="split-right-indice" onchange="renderSplitMapa()"></select>
                   </div>
                   <div id="split-legend-right" style="position:absolute;bottom:24px;left:8px;z-index:500;background:rgba(13,17,23,0.88);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:0.68rem;min-width:120px"></div>
                 </div>
@@ -816,15 +814,24 @@ const INDICES_CONFIG = {
 const NOMBRES_ZONAS = { 1: 'Baja', 2: 'Media', 3: 'Alta' };
 
 // Devuelve el color de zona según el índice activo (alineado con la simbología del índice)
-function getColorZona(clase, indice) {
+// Clasifica una zona usando el valor medio del índice y agrupa las 7 clases en 3:
+// clases 1-2 → Baja (rojo/naranja), clases 3-5 → Media (amarillo/verde claro), 6-7 → Alta (verde)
+function getColorZona(clase, indice, valorMedio) {
   const cfg = INDICES_CONFIG[indice];
-  if (!cfg) return ['#D73027','#FEE04F','#1A9850'][clase-1] || '#888';
-  const rangos = cfg.rangos; // 7 clases ordenadas de menor a mayor
-  // Baja (clase 1) → promedio de rangos 1-2 (rojo/naranja)
-  // Media (clase 2) → promedio de rangos 3-5 (amarillo/verde claro)
-  // Alta (clase 3) → promedio de rangos 6-7 (verde oscuro)
-  const mapa = { 1: rangos[1]?.color || '#FC8D59', 2: rangos[3]?.color || '#D9EF8B', 3: rangos[5]?.color || '#1A9850' };
-  return mapa[clase] || '#888';
+  if (!cfg) return ['#D73027', '#FEE08B', '#1A9850'][clase - 1] || '#888';
+
+  // Si tenemos el valor medio real, clasificar directamente con la escala del índice
+  if (valorMedio !== undefined && valorMedio !== null && !isNaN(valorMedio)) {
+    const rango = clasificarValor(parseFloat(valorMedio), indice);
+    if (rango) return rango.color;
+  }
+
+  // Fallback: mapear clase 1-2 → Baja, 3-5 → Media, 6-7 → Alta usando colores del índice
+  const rangos = cfg.rangos;
+  if (clase === 1) return rangos[1]?.color || '#FC8D59';      // Baja → naranja
+  if (clase === 2) return rangos[3]?.color || '#D9EF8B';      // Media → verde claro
+  if (clase === 3) return rangos[5]?.color || '#1A9850';      // Alta → verde
+  return '#888';
 }
 
 // ================================================================
@@ -1575,8 +1582,10 @@ function renderMapa() {
 
     estado.capas.zonas = L.geoJSON({ type:'FeatureCollection', features:zonasFiltradas }, {
       style: f => {
-        const clase = parseInt(f.properties?.clase) || 1;
-        const col = getColorZona(clase, indiceZ);
+        const p = f.properties || {};
+        const clase = parseInt(p.clase) || 1;
+        const valorMedio = p[`${indiceZ}_mean`];
+        const col = getColorZona(clase, indiceZ, valorMedio);
         const opacidad = clase === 1 ? 0.72 : clase === 2 ? 0.62 : 0.52;
         return { color: col, weight: 1.5, fillColor: col, fillOpacity: opacidad };
       },
@@ -1990,17 +1999,16 @@ function initSplitMaps() {
     L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { attribution: '© Google' }).addTo(splitState.maps.right);
     splitState.maps.right.on('moveend zoomend', () => { if (splitState.syncEnabled && !splitState.syncing) { splitState.syncing = true; splitState.maps.left?.setView(splitState.maps.right.getCenter(), splitState.maps.right.getZoom(), { animate: false }); splitState.syncing = false; } });
   }
-  // Poblar selectores
+  // Poblar solo selectores de vuelo
   const fechas = [...estado.fechas].sort();
-  const indices = Object.keys(INDICES_CONFIG);
   ['left', 'right'].forEach((side, si) => {
     const svuelo = document.getElementById(`split-${side}-vuelo`);
-    const sindice = document.getElementById(`split-${side}-indice`);
-    svuelo.innerHTML = fechas.map(f => `<option value="${f}">${f}</option>`).join('');
-    sindice.innerHTML = indices.map(i => `<option value="${i}">${INDICES_CONFIG[i].nombre}</option>`).join('');
-    // Default: izquierda vuelo 1, derecha vuelo 3
-    if (si === 0 && fechas.length > 0) svuelo.value = fechas[0];
-    if (si === 1 && fechas.length > 1) svuelo.value = fechas[fechas.length - 1];
+    if (svuelo) {
+      svuelo.innerHTML = fechas.map(f => `<option value="${f}">${f}</option>`).join('');
+      // Default: izquierda vuelo 1, derecha último vuelo
+      if (si === 0 && fechas.length > 0) svuelo.value = fechas[0];
+      if (si === 1 && fechas.length > 1) svuelo.value = fechas[fechas.length - 1];
+    }
   });
   setTimeout(() => {
     splitState.maps.left.invalidateSize();
@@ -2019,7 +2027,7 @@ function renderSplitMapa() {
     const map = splitState.maps[side];
     if (!map) return;
     const vuelo  = document.getElementById(`split-${side}-vuelo`)?.value;
-    const indice = document.getElementById(`split-${side}-indice`)?.value || 'ndvi';
+    const indice = estado.indiceActivo;  // Siempre usa el índice activo del sidebar
     const cfg    = INDICES_CONFIG[indice];
 
     // Limpiar capas anteriores
@@ -2055,8 +2063,10 @@ function renderSplitMapa() {
       if (zonasFiltradas.length > 0) {
         splitState.capas[side].zonas = L.geoJSON({ type: 'FeatureCollection', features: zonasFiltradas }, {
           style: f => {
-            const clase = parseInt(f.properties?.clase) || 1;
-            const col = getColorZona(clase, indice);
+            const p = f.properties || {};
+            const clase = parseInt(p.clase) || 1;
+            const valorMedio = p[`${indice}_mean`];
+            const col = getColorZona(clase, indice, valorMedio);
             return { color: col, weight: 1.5, fillColor: col, fillOpacity: clase === 1 ? 0.72 : clase === 2 ? 0.62 : 0.52 };
           }
         }).addTo(map);
