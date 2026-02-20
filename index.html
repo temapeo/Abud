@@ -219,7 +219,22 @@ input:checked + .slider-sw:before { transform: translateX(14px); }
 .mini-kpi { background: var(--bg3); border-radius: 6px; padding: 8px 10px; }
 .mini-kpi-label { font-size: 0.62rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
 .mini-kpi-val { font-size: 1rem; font-weight: 700; font-family: var(--mono); margin-top: 2px; }
-.canvas-container { position: relative; height: 180px; }
+.canvas-container { position: relative; height: 160px; }
+.mini-map-container { position: relative; height: 200px; margin-top: 10px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+.mini-map-label { position: absolute; top: 6px; left: 6px; z-index: 500; background: rgba(13,17,23,0.85); color: var(--accent); font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.06em; }
+#split-container { display: flex; height: 100%; gap: 3px; }
+.split-panel { flex: 1; position: relative; min-width: 0; }
+.split-map { width: 100%; height: 100%; }
+.split-header { position: absolute; top: 8px; left: 8px; z-index: 500; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.split-selector { background: rgba(13,17,23,0.92); border: 1px solid var(--border); color: var(--text); font-size: 0.72rem; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+.split-label { background: rgba(0,191,255,0.15); border: 1px solid var(--accent); color: var(--accent); font-size: 0.68rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+.split-sync-btn { position: absolute; top: 8px; right: 8px; z-index: 500; background: rgba(13,17,23,0.85); border: 1px solid var(--border); color: var(--text-dim); font-size: 0.68rem; padding: 3px 8px; border-radius: 6px; cursor: pointer; }
+.split-sync-btn:hover { border-color: var(--accent); color: var(--accent); }
+.split-divider { width: 3px; background: var(--border); flex-shrink: 0; }
+.tree-popup { font-family: 'DM Sans', sans-serif; font-size: 0.78rem; min-width: 200px; color: #e6edf3; }
+.tree-popup-title { font-weight: 700; font-size: 0.88rem; margin-bottom: 8px; color: #00BFFF; border-bottom: 1px solid #30363d; padding-bottom: 5px; }
+.tree-popup-row { display: flex; justify-content: space-between; padding: 3px 0; gap: 12px; }
+.tree-popup-delta { font-size: 0.7rem; color: #8b949e; margin-top: 6px; padding-top: 4px; border-top: 1px solid #30363d; }
 
 /* Estado badge en resumen */
 .estado-badge {
@@ -569,19 +584,19 @@ input:checked + .slider-sw:before { transform: translateX(14px); }
       <!-- Leyenda Zonas -->
       <div class="sidebar-section">
         <div class="sidebar-section-title">Leyenda — Zonas Manejo</div>
-        <div class="legend-items">
+        <div class="legend-items" id="zona-legend-items">
           <div class="legend-item">
-            <div class="legend-dot" style="background:#D73027"></div>
+            <div class="legend-dot" id="zona-dot-baja" style="background:#FC8D59"></div>
             <span>Baja</span>
             <span class="legend-range" id="zona-rango-baja">—</span>
           </div>
           <div class="legend-item">
-            <div class="legend-dot" style="background:#FEE04F"></div>
+            <div class="legend-dot" id="zona-dot-media" style="background:#D9EF8B"></div>
             <span>Media</span>
             <span class="legend-range" id="zona-rango-media">—</span>
           </div>
           <div class="legend-item">
-            <div class="legend-dot" style="background:#1A9850"></div>
+            <div class="legend-dot" id="zona-dot-alta" style="background:#1A9850"></div>
             <span>Alta</span>
             <span class="legend-range" id="zona-rango-alta">—</span>
           </div>
@@ -621,34 +636,67 @@ input:checked + .slider-sw:before { transform: translateX(14px); }
         <!-- PANEL MAPA -->
         <div class="panel" id="panel-mapa">
           <div id="mapa-container">
-            <div id="map"></div>
+            <!-- Modo: simple o split -->
+            <div id="map-mode-bar" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:600;display:flex;gap:4px;background:rgba(13,17,23,0.92);border:1px solid var(--border);border-radius:8px;padding:4px">
+              <button id="btn-mode-single" onclick="setMapMode('single')" style="font-size:0.7rem;padding:4px 12px;border-radius:5px;border:none;cursor:pointer;background:var(--accent);color:#000;font-weight:700">Vista simple</button>
+              <button id="btn-mode-split" onclick="setMapMode('split')" style="font-size:0.7rem;padding:4px 12px;border-radius:5px;border:none;cursor:pointer;background:transparent;color:var(--text-dim)">Comparar vuelos</button>
+            </div>
 
-            <!-- Controles flotantes -->
-            <div id="map-controls">
-              <!-- Selector vuelo -->
-              <div class="map-panel" id="map-vuelo-panel" style="display:none">
-                <div class="map-panel-title">Vuelo activo</div>
-                <div class="vuelo-selector" id="map-vuelo-selector"></div>
+            <!-- VISTA SIMPLE -->
+            <div id="single-view" style="width:100%;height:100%;position:relative">
+              <div id="map"></div>
+              <div id="map-controls">
+                <div class="map-panel" id="map-vuelo-panel" style="display:none">
+                  <div class="map-panel-title">Vuelo activo</div>
+                  <div class="vuelo-selector" id="map-vuelo-selector"></div>
+                </div>
+                <div class="map-panel">
+                  <div class="map-panel-title">Índice visualizado</div>
+                  <div id="map-indice-name" style="font-size:0.85rem;font-weight:600;color:var(--accent)">—</div>
+                  <div id="map-indice-desc" style="font-size:0.7rem;color:var(--text-dim);margin-top:2px">—</div>
+                </div>
               </div>
-
-              <!-- Índice activo -->
-              <div class="map-panel">
-                <div class="map-panel-title">Índice visualizado</div>
-                <div id="map-indice-name" style="font-size:0.85rem;font-weight:600;color:var(--accent)">—</div>
-                <div id="map-indice-desc" style="font-size:0.7rem;color:var(--text-dim);margin-top:2px">—</div>
+              <div id="map-legend">
+                <div class="mleg-title" id="mleg-title">Simbología</div>
+                <div class="mleg-items" id="mleg-items"></div>
+              </div>
+              <div id="map-info">
+                <div id="map-info-title">Árbol</div>
+                <div id="map-info-rows"></div>
               </div>
             </div>
 
-            <!-- Leyenda flotante -->
-            <div id="map-legend">
-              <div class="mleg-title" id="mleg-title">Simbología</div>
-              <div class="mleg-items" id="mleg-items"></div>
-            </div>
-
-            <!-- Info hover -->
-            <div id="map-info">
-              <div id="map-info-title">Árbol</div>
-              <div id="map-info-rows"></div>
+            <!-- VISTA SPLIT -->
+            <div id="split-view" style="width:100%;height:100%;display:none">
+              <div id="split-container">
+                <div class="split-panel" id="split-left-panel">
+                  <div id="split-map-left" class="split-map"></div>
+                  <div class="split-header">
+                    <span class="split-label">PANEL A</span>
+                    <select class="split-selector" id="split-left-vuelo" onchange="renderSplitMapa()"></select>
+                    <select class="split-selector" id="split-left-indice" onchange="renderSplitMapa()"></select>
+                  </div>
+                  <div id="split-legend-left" style="position:absolute;bottom:24px;left:8px;z-index:500;background:rgba(13,17,23,0.88);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:0.68rem;min-width:120px"></div>
+                </div>
+                <div class="split-divider"></div>
+                <div class="split-panel" id="split-right-panel">
+                  <div id="split-map-right" class="split-map"></div>
+                  <div class="split-header">
+                    <span class="split-label">PANEL B</span>
+                    <select class="split-selector" id="split-right-vuelo" onchange="renderSplitMapa()"></select>
+                    <select class="split-selector" id="split-right-indice" onchange="renderSplitMapa()"></select>
+                  </div>
+                  <div id="split-legend-right" style="position:absolute;bottom:24px;left:8px;z-index:500;background:rgba(13,17,23,0.88);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:0.68rem;min-width:120px"></div>
+                </div>
+              </div>
+              <div id="split-sync-bar" style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);z-index:600;background:rgba(13,17,23,0.92);border:1px solid var(--border);border-radius:8px;padding:4px 10px;display:flex;align-items:center;gap:8px">
+                <span style="font-size:0.7rem;color:var(--text-dim)">Sincronizar zoom</span>
+                <label style="position:relative;display:inline-block;width:32px;height:18px">
+                  <input type="checkbox" id="split-sync-check" checked style="opacity:0;width:0;height:0" onchange="toggleSyncMaps()">
+                  <span style="position:absolute;cursor:pointer;inset:0;background:var(--accent);border-radius:9px;transition:.3s"></span>
+                </label>
+                <span style="font-size:0.7rem;color:var(--text-dim)">Clic en árbol: comparativa</span>
+              </div>
             </div>
           </div>
         </div>
@@ -765,8 +813,19 @@ const INDICES_CONFIG = {
   }
 };
 
-const COLORES_ZONAS = { 1: '#D73027', 2: '#FEE04F', 3: '#1A9850' };
 const NOMBRES_ZONAS = { 1: 'Baja', 2: 'Media', 3: 'Alta' };
+
+// Devuelve el color de zona según el índice activo (alineado con la simbología del índice)
+function getColorZona(clase, indice) {
+  const cfg = INDICES_CONFIG[indice];
+  if (!cfg) return ['#D73027','#FEE04F','#1A9850'][clase-1] || '#888';
+  const rangos = cfg.rangos; // 7 clases ordenadas de menor a mayor
+  // Baja (clase 1) → promedio de rangos 1-2 (rojo/naranja)
+  // Media (clase 2) → promedio de rangos 3-5 (amarillo/verde claro)
+  // Alta (clase 3) → promedio de rangos 6-7 (verde oscuro)
+  const mapa = { 1: rangos[1]?.color || '#FC8D59', 2: rangos[3]?.color || '#D9EF8B', 3: rangos[5]?.color || '#1A9850' };
+  return mapa[clase] || '#888';
+}
 
 // ================================================================
 // ESTADO GLOBAL
@@ -1114,12 +1173,19 @@ function renderLeyenda() {
     });
   }
 
-  // Zonas leyenda
+  // Zonas leyenda — colores dinámicos según índice activo
   const z = cfg.zonas;
+  const indiceActivo = estado.indiceActivo;
   if (z) {
     document.getElementById('zona-rango-baja').textContent = z.baja;
     document.getElementById('zona-rango-media').textContent = z.media;
     document.getElementById('zona-rango-alta').textContent = z.alta;
+    const dotBaja  = document.getElementById('zona-dot-baja');
+    const dotMedia = document.getElementById('zona-dot-media');
+    const dotAlta  = document.getElementById('zona-dot-alta');
+    if (dotBaja)  dotBaja.style.background  = getColorZona(1, indiceActivo);
+    if (dotMedia) dotMedia.style.background = getColorZona(2, indiceActivo);
+    if (dotAlta)  dotAlta.style.background  = getColorZona(3, indiceActivo);
   }
 
   // Mapa legend
@@ -1260,7 +1326,7 @@ function renderResumen() {
     const estadoLabel = { excelente: '🟢 EXCELENTE', bueno: '🟡 BUENO', regular: '🟠 REGULAR', critico: '🔴 CRÍTICO' }[estadoBadge];
 
     const chartId = `chart-vuelo-${i}`;
-    chartIds.push({ id: chartId, distrib, colors: cfg.rangos.map(r=>r.color) });
+    chartIds.push({ id: chartId, distrib, colors: cfg.rangos.map(r=>r.color), features: fFeatures, fecha, idx: i });
 
     html += `
     <div class="vuelo-card">
@@ -1288,6 +1354,9 @@ function renderResumen() {
       </div>
       <div class="canvas-container">
         <canvas id="${chartId}"></canvas>
+      </div>
+      <div class="mini-map-container" id="minimap-${i}">
+        <div class="mini-map-label">${indice.toUpperCase()} — Distribución espacial</div>
       </div>
     </div>`;
   });
@@ -1320,8 +1389,8 @@ function renderResumen() {
 
   cont.innerHTML = html;
 
-  // Crear charts
-  chartIds.forEach(({ id, distrib, colors }) => {
+  // Crear charts y mini-mapas
+  chartIds.forEach(({ id, distrib, colors, features: fts, idx }) => {
     const ctx = document.getElementById(id);
     if (!ctx) return;
     new Chart(ctx, {
@@ -1350,6 +1419,11 @@ function renderResumen() {
         }
       }
     });
+
+    // Crear mini-mapa (con pequeño delay para que el DOM esté listo)
+    setTimeout(() => {
+      crearMiniMapa(`minimap-${idx}`, fts, indice);
+    }, 200 + idx * 100);
   });
 }
 
@@ -1476,7 +1550,7 @@ function renderMapa() {
 
     const colorZona = f => {
       const clase = f.properties?.clase || f.properties?.Clase || 1;
-      return COLORES_ZONAS[clase] || '#888';
+      return getColorZona(clase, indice);
     };
 
     estado.capas.zonas = L.geoJSON({ type:'FeatureCollection', features:zonasFiltradas }, {
@@ -1848,6 +1922,200 @@ function descargarCSV() {
   a.href = URL.createObjectURL(blob);
   a.download = `TeMapeo_Abud_${indice}_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
+}
+
+// ================================================================
+// MODO MAPA: SIMPLE / SPLIT
+// ================================================================
+const splitState = {
+  maps: { left: null, right: null },
+  capas: { left: {}, right: {} },
+  syncing: false,
+  syncEnabled: true,
+};
+
+function setMapMode(mode) {
+  const singleView = document.getElementById('single-view');
+  const splitView  = document.getElementById('split-view');
+  document.getElementById('btn-mode-single').style.background = mode === 'single' ? 'var(--accent)' : 'transparent';
+  document.getElementById('btn-mode-single').style.color = mode === 'single' ? '#000' : 'var(--text-dim)';
+  document.getElementById('btn-mode-split').style.background = mode === 'split' ? 'var(--accent)' : 'transparent';
+  document.getElementById('btn-mode-split').style.color = mode === 'split' ? '#000' : 'var(--text-dim)';
+
+  if (mode === 'single') {
+    singleView.style.display = 'block';
+    splitView.style.display = 'none';
+    setTimeout(() => estado.map?.invalidateSize(), 100);
+  } else {
+    singleView.style.display = 'none';
+    splitView.style.display = 'block';
+    initSplitMaps();
+  }
+}
+
+function initSplitMaps() {
+  if (!splitState.maps.left) {
+    splitState.maps.left = L.map('split-map-left', { zoomControl: true, center: estado.map.getCenter(), zoom: estado.map.getZoom() });
+    L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { attribution: '© Google' }).addTo(splitState.maps.left);
+    splitState.maps.left.on('moveend zoomend', () => { if (splitState.syncEnabled && !splitState.syncing) { splitState.syncing = true; splitState.maps.right?.setView(splitState.maps.left.getCenter(), splitState.maps.left.getZoom(), { animate: false }); splitState.syncing = false; } });
+  }
+  if (!splitState.maps.right) {
+    splitState.maps.right = L.map('split-map-right', { zoomControl: true, center: estado.map.getCenter(), zoom: estado.map.getZoom() });
+    L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { attribution: '© Google' }).addTo(splitState.maps.right);
+    splitState.maps.right.on('moveend zoomend', () => { if (splitState.syncEnabled && !splitState.syncing) { splitState.syncing = true; splitState.maps.left?.setView(splitState.maps.right.getCenter(), splitState.maps.right.getZoom(), { animate: false }); splitState.syncing = false; } });
+  }
+  // Poblar selectores
+  const fechas = [...estado.fechas].sort();
+  const indices = Object.keys(INDICES_CONFIG);
+  ['left', 'right'].forEach((side, si) => {
+    const svuelo = document.getElementById(`split-${side}-vuelo`);
+    const sindice = document.getElementById(`split-${side}-indice`);
+    svuelo.innerHTML = fechas.map(f => `<option value="${f}">${f}</option>`).join('');
+    sindice.innerHTML = indices.map(i => `<option value="${i}">${INDICES_CONFIG[i].nombre}</option>`).join('');
+    // Default: izquierda vuelo 1, derecha vuelo 3
+    if (si === 0 && fechas.length > 0) svuelo.value = fechas[0];
+    if (si === 1 && fechas.length > 1) svuelo.value = fechas[fechas.length - 1];
+  });
+  setTimeout(() => {
+    splitState.maps.left.invalidateSize();
+    splitState.maps.right.invalidateSize();
+    renderSplitMapa();
+  }, 150);
+}
+
+function renderSplitMapa() {
+  if (!estado.datos) return;
+  ['left', 'right'].forEach(side => {
+    const map = splitState.maps[side];
+    if (!map) return;
+    const vuelo  = document.getElementById(`split-${side}-vuelo`)?.value;
+    const indice = document.getElementById(`split-${side}-indice`)?.value || 'ndvi';
+    const cfg    = INDICES_CONFIG[indice];
+
+    // Limpiar capas
+    Object.values(splitState.capas[side]).forEach(l => { try { map.removeLayer(l); } catch(e) {} });
+    splitState.capas[side] = {};
+
+    const features = getFeaturesFiltrados().filter(f => String(f.properties?.fecha_vuelo) === vuelo);
+
+    // Polígonos
+    if (estado.poligonos) {
+      const cuartelesActivos = new Set(features.map(f => f.properties?.Cuartel));
+      const gjPol = { type: 'FeatureCollection', features: (estado.poligonos.features || []).filter(f => cuartelesActivos.has(f.properties?.Cuartel)) };
+      splitState.capas[side].pol = L.geoJSON(gjPol, { style: () => ({ color: '#00BFFF', weight: 2, opacity: 0.8, fillOpacity: 0 }) }).addTo(map);
+    }
+
+    // Puntos con popup comparativo al clic
+    splitState.capas[side].puntos = L.geoJSON({ type: 'FeatureCollection', features }, {
+      pointToLayer: (feature, latlng) => {
+        const v = getValorIndice(feature.properties, indice);
+        const r = v !== null ? clasificarValor(v, indice) : null;
+        return L.circleMarker(latlng, { radius: 3.5, fillColor: r ? r.color : '#888', color: 'transparent', fillOpacity: 0.85, weight: 0 });
+      },
+      onEachFeature: (feature, layer) => {
+        layer.on('click', () => mostrarPopupComparativo(feature, layer, map, indice));
+      }
+    }).addTo(map);
+
+    // Ajustar bounds
+    if (features.length > 0) {
+      try { const b = splitState.capas[side].puntos.getBounds(); if (b.isValid()) map.fitBounds(b, { padding: [20, 20] }); } catch(e) {}
+    }
+
+    // Leyenda
+    const legEl = document.getElementById(`split-legend-${side}`);
+    if (legEl) {
+      legEl.innerHTML = `<div style="font-size:0.65rem;font-weight:700;color:var(--accent);margin-bottom:5px">${cfg.nombre}</div>` +
+        cfg.rangos.map(r => `<div style="display:flex;align-items:center;gap:5px;padding:1px 0"><div style="width:9px;height:9px;border-radius:50%;background:${r.color};flex-shrink:0"></div><span style="color:#e6edf3">${r.label}</span></div>`).join('');
+    }
+  });
+}
+
+function mostrarPopupComparativo(feature, layer, map, indice) {
+  const p = feature.properties || {};
+  const idArbol = p.id_global || p.id || '—';
+  const cuartel = p.Cuartel || '—';
+  const especie = p.Especie || '—';
+  const variedad = p.Variedad || '—';
+  const lon = feature.geometry.coordinates[0];
+  const lat = feature.geometry.coordinates[1];
+
+  // Buscar en todos los vuelos
+  const todasFeatures = estado.datos.features || [];
+  const mismoPunto = todasFeatures.filter(f => {
+    const dx = Math.abs((f.geometry.coordinates[0] || 0) - lon);
+    const dy = Math.abs((f.geometry.coordinates[1] || 0) - lat);
+    return dx < 0.00005 && dy < 0.00005;
+  });
+
+  const porVuelo = {};
+  mismoPunto.forEach(f => {
+    const v = f.properties?.vuelo_id || String(f.properties?.fecha_vuelo);
+    if (!porVuelo[v]) porVuelo[v] = f.properties;
+  });
+
+  const vueloss = Object.keys(porVuelo).sort();
+  const cfg = INDICES_CONFIG[indice];
+  let filas = vueloss.map(v => {
+    const val = getValorIndice(porVuelo[v], indice);
+    const r = val !== null ? clasificarValor(val, indice) : null;
+    return `<div class="tree-popup-row">
+      <span class="tree-popup-vuelo" style="color:var(--text-dim)">${v}</span>
+      <span class="tree-popup-val" style="color:${r?.color||'white'}">${val !== null ? val.toFixed(3) : '—'} <small>${r?.label||''}</small></span>
+    </div>`;
+  }).join('');
+
+  // Delta primer/último vuelo
+  let delta = '';
+  if (vueloss.length >= 2) {
+    const v1 = getValorIndice(porVuelo[vueloss[0]], indice);
+    const v2 = getValorIndice(porVuelo[vueloss[vueloss.length-1]], indice);
+    if (v1 !== null && v2 !== null) {
+      const d = v2 - v1;
+      const arrow = d > 0.01 ? '📈' : d < -0.01 ? '📉' : '➡️';
+      delta = `<div class="tree-popup-delta">${arrow} Δ ${d > 0 ? '+' : ''}${d.toFixed(3)} entre vuelo 1 y ${vueloss.length}</div>`;
+    }
+  }
+
+  const html = `<div class="tree-popup">
+    <div class="tree-popup-title">🌳 ${cuartel} — ${especie} ${variedad}</div>
+    <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:6px">${cfg.nombre_completo}</div>
+    ${filas}${delta}
+  </div>`;
+
+  layer.bindPopup(html, { maxWidth: 260 }).openPopup();
+}
+
+function toggleSyncMaps() {
+  splitState.syncEnabled = document.getElementById('split-sync-check')?.checked;
+}
+
+// ================================================================
+// MINI-MAPAS EN RESUMEN
+// ================================================================
+const miniMaps = {};
+
+function crearMiniMapa(containerId, features, indice, fecha) {
+  if (miniMaps[containerId]) {
+    try { miniMaps[containerId].remove(); } catch(e) {}
+    miniMaps[containerId] = null;
+  }
+  const cfg = INDICES_CONFIG[indice];
+  const map = L.map(containerId, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false });
+  L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}').addTo(map);
+
+  const layer = L.geoJSON({ type: 'FeatureCollection', features }, {
+    pointToLayer: (feature, latlng) => {
+      const v = getValorIndice(feature.properties, indice);
+      const r = v !== null ? clasificarValor(v, indice) : null;
+      return L.circleMarker(latlng, { radius: 3, fillColor: r ? r.color : '#888', color: 'transparent', fillOpacity: 0.85, weight: 0 });
+    }
+  }).addTo(map);
+
+  if (features.length > 0) {
+    try { const b = layer.getBounds(); if (b.isValid()) map.fitBounds(b, { padding: [8, 8] }); } catch(e) {}
+  }
+  miniMaps[containerId] = map;
 }
 
 // ================================================================
