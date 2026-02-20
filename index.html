@@ -407,6 +407,22 @@ input:checked + .slider-sw:before { transform: translateX(14px); }
 </head>
 <body>
 
+<!-- OVERLAY DE CARGA -->
+<div id="loading-overlay" style="display:flex;position:fixed;inset:0;z-index:9999;background:#0d1117;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+  <div style="font-size:2.5rem">🌿</div>
+  <div style="font-family:'DM Sans',sans-serif;color:#e6edf3;font-size:1.1rem;font-weight:500">Cargando datos Abud & Cía</div>
+  <div style="font-family:'DM Sans',sans-serif;color:#8b949e;font-size:0.85rem">Esto puede tomar unos segundos...</div>
+  <div style="width:200px;height:4px;background:#21262d;border-radius:4px;overflow:hidden;margin-top:8px">
+    <div style="height:100%;width:60%;background:#00BFFF;border-radius:4px;animation:loadbar 1.5s ease-in-out infinite"></div>
+  </div>
+</div>
+<style>
+@keyframes loadbar {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+</style>
+
 <div id="app">
   <!-- HEADER -->
   <header id="header">
@@ -428,7 +444,7 @@ input:checked + .slider-sw:before { transform: translateX(14px); }
         </svg>
         Cargar datos
       </button>
-      <input type="file" id="file-input" accept=".geojson,.json" multiple>
+      <input type="file" id="file-input" accept=".geojson,.json,.csv" multiple>
     </div>
   </header>
 
@@ -596,7 +612,7 @@ input:checked + .slider-sw:before { transform: translateX(14px); }
               <div id="drop-zone" onclick="document.getElementById('file-input').click()">
                 <div id="drop-zone-icon">📂</div>
                 <div id="drop-zone-text">Haz clic o arrastra tu archivo GeoJSON aquí</div>
-                <div id="drop-zone-sub">Soporta: BD_FINAL.geojson, Zonas_Manejo.geojson, Poligonos.geojson</div>
+                <div id="drop-zone-sub">Soporta: BD_FINAL.csv, Zonas_Manejo.geojson, Poligonos.geojson</div>
               </div>
             </div>
           </div>
@@ -777,13 +793,72 @@ let estado = {
 // ================================================================
 // INICIALIZACIÓN
 // ================================================================
+const DATOS_URL = {
+  csv:      'https://raw.githubusercontent.com/temapeo/Abud/main/datos/BD_FINAL.csv',
+  poligonos:'https://raw.githubusercontent.com/temapeo/Abud/main/datos/Poligonos.geojson',
+  zonas:    'https://raw.githubusercontent.com/temapeo/Abud/main/datos/Zonas_Manejo.geojson',
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
   renderLeyenda();
   renderIndiceBtns();
   setupFileInput();
   setupDropZone();
+  cargarDatosAuto();
 });
+
+async function cargarDatosAuto() {
+  mostrarCargando(true);
+  try {
+    const [respPol, respZonas] = await Promise.all([
+      fetch(DATOS_URL.poligonos),
+      fetch(DATOS_URL.zonas),
+    ]);
+    estado.poligonos = await respPol.json();
+    estado.zonas     = await respZonas.json();
+
+    const respCSV = await fetch(DATOS_URL.csv);
+    const textoCSV = await respCSV.text();
+    estado.datos = csvAGeoJSON(textoCSV);
+
+    mostrarCargando(false);
+    procesarDatos();
+    showToast(`✅ ${estado.datos.features.length.toLocaleString()} árboles cargados`, 'success');
+  } catch(err) {
+    mostrarCargando(false);
+    showToast(`❌ Error al cargar datos: ${err.message}`, 'error');
+  }
+}
+
+function csvAGeoJSON(texto) {
+  const lineas = texto.trim().split('\n');
+  const headers = lineas[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
+  const features = [];
+  for (let i = 1; i < lineas.length; i++) {
+    const vals = lineas[i].split(',');
+    if (vals.length < headers.length) continue;
+    const props = {};
+    headers.forEach((h, j) => {
+      const v = vals[j]?.trim().replace(/^"|"$/g,'');
+      props[h] = isNaN(v) || v === '' ? v : parseFloat(v);
+    });
+    const lon = parseFloat(props.lon);
+    const lat = parseFloat(props.lat);
+    if (isNaN(lon) || isNaN(lat)) continue;
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [lon, lat] },
+      properties: props,
+    });
+  }
+  return { type: 'FeatureCollection', features };
+}
+
+function mostrarCargando(activo) {
+  const el = document.getElementById('loading-overlay');
+  if (el) el.style.display = activo ? 'flex' : 'none';
+}
 
 // ================================================================
 // MAPA — Inicialización
