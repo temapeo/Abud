@@ -1192,8 +1192,11 @@ function renderLeyenda() {
   const mlegItems = document.getElementById('mleg-items');
   const mlegTitle = document.getElementById('mleg-title');
   if (mlegItems) {
+    const indice = estado.indiceActivo;
+    const cfg = INDICES_CONFIG[indice];
     mlegTitle.textContent = cfg.nombre;
     mlegItems.innerHTML = '';
+    // Leyenda 7 clases del índice
     cfg.rangos.forEach(r => {
       const rangeStr = r.min <= -1 ? `< ${r.max}` : r.max >= 2 ? `≥ ${r.min}` : `${r.min}–${r.max}`;
       mlegItems.innerHTML += `
@@ -1203,6 +1206,25 @@ function renderLeyenda() {
           <span class="mleg-range">${rangeStr}</span>
         </div>`;
     });
+    // Separador + leyenda zonas de manejo
+    const zCfg = cfg.zonas;
+    if (zCfg) {
+      mlegItems.innerHTML += `<div style="border-top:1px solid var(--border);margin:6px 0 4px"></div>
+        <div style="font-size:0.6rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Zonas de manejo</div>`;
+      [
+        { clase: 1, label: 'Baja',  rango: zCfg.baja  },
+        { clase: 2, label: 'Media', rango: zCfg.media },
+        { clase: 3, label: 'Alta',  rango: zCfg.alta  },
+      ].forEach(z => {
+        const col = getColorZona(z.clase, indice);
+        mlegItems.innerHTML += `
+          <div class="mleg-item">
+            <div style="width:14px;height:10px;border-radius:2px;background:${col};opacity:0.85;flex-shrink:0"></div>
+            <span>${z.label}</span>
+            <span class="mleg-range">${z.rango}</span>
+          </div>`;
+      });
+    }
   }
 
   // Info panel
@@ -1540,39 +1562,38 @@ function renderMapa() {
 
   // 2. Zonas de manejo
   if (estado.zonas) {
-    const indice = estado.indiceActivo;
+    const indiceZ = estado.indiceActivo;
     const zonasFiltradas = (estado.zonas.features || []).filter(f => {
       const p = f.properties || {};
-      if (p.indice && p.indice !== indice) return false;
-      if (p.fecha_vuelo && String(p.fecha_vuelo) !== vuelo) return false;
+      // Comparar ignorando case y tipo
+      const pIndice = String(p.indice || '').toLowerCase();
+      const pFecha  = String(p.fecha_vuelo || '');
+      if (pIndice && pIndice !== indiceZ.toLowerCase()) return false;
+      if (pFecha  && pFecha  !== String(vuelo)) return false;
       return true;
     });
 
-    const colorZona = f => {
-      const clase = f.properties?.clase || f.properties?.Clase || 1;
-      return getColorZona(clase, indice);
-    };
-
     estado.capas.zonas = L.geoJSON({ type:'FeatureCollection', features:zonasFiltradas }, {
       style: f => {
-        const col = colorZona(f);
-        const clase = f.properties?.clase || 1;
-        const opacidad = clase === 1 ? 0.75 : clase === 2 ? 0.65 : 0.55;
-        return { color: col, weight: 1, fillColor: col, fillOpacity: opacidad };
+        const clase = parseInt(f.properties?.clase) || 1;
+        const col = getColorZona(clase, indiceZ);
+        const opacidad = clase === 1 ? 0.72 : clase === 2 ? 0.62 : 0.52;
+        return { color: col, weight: 1.5, fillColor: col, fillOpacity: opacidad };
       },
       onEachFeature: (feature, layer) => {
         const p = feature.properties || {};
-        const clase = p.clase || 1;
-        const nombre = NOMBRES_ZONAS[clase] || '—';
+        const clase = parseInt(p.clase) || 1;
+        const nombre = p.clase_nombre || NOMBRES_ZONAS[clase] || '—';
         const ha = parseFloat(p.area_ha || 0).toFixed(2);
         const pct = parseFloat(p.pct_area || 0).toFixed(1);
-        const cfg = INDICES_CONFIG[indice];
+        const cfg = INDICES_CONFIG[indiceZ];
         const rango = clase === 1 ? cfg?.zonas?.baja : clase === 2 ? cfg?.zonas?.media : cfg?.zonas?.alta;
+        const valMean = p[`${indiceZ}_mean`];
+        const valStr = valMean !== undefined && valMean !== null ? `μ ${parseFloat(valMean).toFixed(3)}` : '';
         layer.bindTooltip(`
-          <strong>Zona ${nombre}</strong><br>
-          ${indice.toUpperCase()}: ${rango || '—'}<br>
-          Cuartel: ${p.cuartel || '—'}<br>
-          ${ha} ha (${pct}%)
+          <strong>Zona ${nombre}</strong> — ${indiceZ.toUpperCase()}<br>
+          Rango: ${rango || '—'} ${valStr ? `| ${valStr}` : ''}<br>
+          Cuartel: ${p.cuartel || '—'} | ${ha} ha (${pct}%)
         `, { sticky: true });
       }
     }).addTo(estado.map);
@@ -2025,16 +2046,18 @@ function renderSplitMapa() {
     if (estado.zonas && mostrarZonas) {
       const zonasFiltradas = (estado.zonas.features || []).filter(f => {
         const p = f.properties || {};
-        if (p.indice && p.indice !== indice) return false;
-        if (p.fecha_vuelo && String(p.fecha_vuelo) !== vuelo) return false;
+        const pIndice = String(p.indice || '').toLowerCase();
+        const pFecha  = String(p.fecha_vuelo || '');
+        if (pIndice && pIndice !== indice.toLowerCase()) return false;
+        if (pFecha  && pFecha  !== String(vuelo)) return false;
         return true;
       });
       if (zonasFiltradas.length > 0) {
         splitState.capas[side].zonas = L.geoJSON({ type: 'FeatureCollection', features: zonasFiltradas }, {
           style: f => {
-            const clase = f.properties?.clase || 1;
+            const clase = parseInt(f.properties?.clase) || 1;
             const col = getColorZona(clase, indice);
-            return { color: col, weight: 1, fillColor: col, fillOpacity: 0.6 };
+            return { color: col, weight: 1.5, fillColor: col, fillOpacity: clase === 1 ? 0.72 : clase === 2 ? 0.62 : 0.52 };
           }
         }).addTo(map);
       }
