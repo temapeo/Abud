@@ -1589,7 +1589,7 @@ function renderMapa() {
       const r = v !== null ? clasificarValor(v, indice) : null;
       const color = r ? r.color : '#888';
       return L.circleMarker(latlng, {
-        radius: 4, fillColor: color, color: 'transparent',
+        radius: 2, fillColor: color, color: 'transparent',
         fillOpacity: 0.88, weight: 0
       });
     },
@@ -1655,29 +1655,34 @@ function renderMapaVueloSelector() {
 
 function actualizarCapas() {
   const map = estado.map;
-  if (!map) return;
+  const mostrarPuntos    = document.getElementById('layer-puntos')?.checked;
+  const mostrarZonas     = document.getElementById('layer-zonas')?.checked;
+  const mostrarPoligonos = document.getElementById('layer-poligonos')?.checked;
+  const mostrarEtiquetas = document.getElementById('layer-etiquetas')?.checked;
 
-  const mostrarPuntos   = document.getElementById('layer-puntos')?.checked;
-  const mostrarZonas    = document.getElementById('layer-zonas')?.checked;
-  const mostrarPoligonos= document.getElementById('layer-poligonos')?.checked;
-  const mostrarEtiquetas= document.getElementById('layer-etiquetas')?.checked;
+  // Vista simple
+  if (map) {
+    if (estado.capas.puntos) {
+      if (mostrarPuntos) { if (!map.hasLayer(estado.capas.puntos)) estado.capas.puntos.addTo(map); }
+      else map.removeLayer(estado.capas.puntos);
+    }
+    if (estado.capas.zonas) {
+      if (mostrarZonas) { if (!map.hasLayer(estado.capas.zonas)) estado.capas.zonas.addTo(map); }
+      else map.removeLayer(estado.capas.zonas);
+    }
+    if (estado.capas.poligonos) {
+      if (mostrarPoligonos) { if (!map.hasLayer(estado.capas.poligonos)) estado.capas.poligonos.addTo(map); }
+      else map.removeLayer(estado.capas.poligonos);
+    }
+    if (estado.capas.etiquetas) {
+      if (mostrarEtiquetas) { if (!map.hasLayer(estado.capas.etiquetas)) estado.capas.etiquetas.addTo(map); }
+      else map.removeLayer(estado.capas.etiquetas);
+    }
+  }
 
-  if (estado.capas.puntos) {
-    if (mostrarPuntos) { if (!map.hasLayer(estado.capas.puntos)) estado.capas.puntos.addTo(map); }
-    else map.removeLayer(estado.capas.puntos);
-  }
-  if (estado.capas.zonas) {
-    if (mostrarZonas) { if (!map.hasLayer(estado.capas.zonas)) estado.capas.zonas.addTo(map); }
-    else map.removeLayer(estado.capas.zonas);
-  }
-  if (estado.capas.poligonos) {
-    if (mostrarPoligonos) { if (!map.hasLayer(estado.capas.poligonos)) estado.capas.poligonos.addTo(map); }
-    else map.removeLayer(estado.capas.poligonos);
-  }
-  if (estado.capas.etiquetas) {
-    if (mostrarEtiquetas) { if (!map.hasLayer(estado.capas.etiquetas)) estado.capas.etiquetas.addTo(map); }
-    else map.removeLayer(estado.capas.etiquetas);
-  }
+  // Vista split — re-renderizar si está activa
+  const splitActivo = document.getElementById('split-view')?.style.display !== 'none';
+  if (splitActivo) renderSplitMapa();
 }
 
 // ================================================================
@@ -1955,12 +1960,12 @@ function setMapMode(mode) {
 
 function initSplitMaps() {
   if (!splitState.maps.left) {
-    splitState.maps.left = L.map('split-map-left', { zoomControl: true, center: estado.map.getCenter(), zoom: estado.map.getZoom() });
+    splitState.maps.left = L.map('split-map-left', { zoomControl: true, scrollWheelZoom: true, center: estado.map.getCenter(), zoom: estado.map.getZoom() });
     L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { attribution: '© Google' }).addTo(splitState.maps.left);
     splitState.maps.left.on('moveend zoomend', () => { if (splitState.syncEnabled && !splitState.syncing) { splitState.syncing = true; splitState.maps.right?.setView(splitState.maps.left.getCenter(), splitState.maps.left.getZoom(), { animate: false }); splitState.syncing = false; } });
   }
   if (!splitState.maps.right) {
-    splitState.maps.right = L.map('split-map-right', { zoomControl: true, center: estado.map.getCenter(), zoom: estado.map.getZoom() });
+    splitState.maps.right = L.map('split-map-right', { zoomControl: true, scrollWheelZoom: true, center: estado.map.getCenter(), zoom: estado.map.getZoom() });
     L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { attribution: '© Google' }).addTo(splitState.maps.right);
     splitState.maps.right.on('moveend zoomend', () => { if (splitState.syncEnabled && !splitState.syncing) { splitState.syncing = true; splitState.maps.left?.setView(splitState.maps.right.getCenter(), splitState.maps.right.getZoom(), { animate: false }); splitState.syncing = false; } });
   }
@@ -1985,6 +1990,10 @@ function initSplitMaps() {
 
 function renderSplitMapa() {
   if (!estado.datos) return;
+  const mostrarPuntos    = document.getElementById('layer-puntos')?.checked !== false;
+  const mostrarZonas     = document.getElementById('layer-zonas')?.checked;
+  const mostrarPoligonos = document.getElementById('layer-poligonos')?.checked !== false;
+
   ['left', 'right'].forEach(side => {
     const map = splitState.maps[side];
     if (!map) return;
@@ -1992,41 +2001,72 @@ function renderSplitMapa() {
     const indice = document.getElementById(`split-${side}-indice`)?.value || 'ndvi';
     const cfg    = INDICES_CONFIG[indice];
 
-    // Limpiar capas
+    // Limpiar capas anteriores
     Object.values(splitState.capas[side]).forEach(l => { try { map.removeLayer(l); } catch(e) {} });
     splitState.capas[side] = {};
 
+    // Respetar filtros globales activos
     const features = getFeaturesFiltrados().filter(f => String(f.properties?.fecha_vuelo) === vuelo);
 
-    // Polígonos
-    if (estado.poligonos) {
+    // Polígonos cuarteles
+    if (estado.poligonos && mostrarPoligonos) {
       const cuartelesActivos = new Set(features.map(f => f.properties?.Cuartel));
       const gjPol = { type: 'FeatureCollection', features: (estado.poligonos.features || []).filter(f => cuartelesActivos.has(f.properties?.Cuartel)) };
-      splitState.capas[side].pol = L.geoJSON(gjPol, { style: () => ({ color: '#00BFFF', weight: 2, opacity: 0.8, fillOpacity: 0 }) }).addTo(map);
+      splitState.capas[side].pol = L.geoJSON(gjPol, {
+        style: () => ({ color: '#00BFFF', weight: 2, opacity: 0.8, fillOpacity: 0 }),
+        onEachFeature: (feature, layer) => {
+          const nombre = feature.properties?.Cuartel || '—';
+          layer.bindTooltip(`<strong>${nombre}</strong>`, { sticky: true });
+        }
+      }).addTo(map);
     }
 
-    // Puntos con popup comparativo al clic
-    splitState.capas[side].puntos = L.geoJSON({ type: 'FeatureCollection', features }, {
-      pointToLayer: (feature, latlng) => {
-        const v = getValorIndice(feature.properties, indice);
-        const r = v !== null ? clasificarValor(v, indice) : null;
-        return L.circleMarker(latlng, { radius: 3.5, fillColor: r ? r.color : '#888', color: 'transparent', fillOpacity: 0.85, weight: 0 });
-      },
-      onEachFeature: (feature, layer) => {
-        layer.on('click', () => mostrarPopupComparativo(feature, layer, map, indice));
+    // Zonas de manejo
+    if (estado.zonas && mostrarZonas) {
+      const zonasFiltradas = (estado.zonas.features || []).filter(f => {
+        const p = f.properties || {};
+        if (p.indice && p.indice !== indice) return false;
+        if (p.fecha_vuelo && String(p.fecha_vuelo) !== vuelo) return false;
+        return true;
+      });
+      if (zonasFiltradas.length > 0) {
+        splitState.capas[side].zonas = L.geoJSON({ type: 'FeatureCollection', features: zonasFiltradas }, {
+          style: f => {
+            const clase = f.properties?.clase || 1;
+            const col = getColorZona(clase, indice);
+            return { color: col, weight: 1, fillColor: col, fillOpacity: 0.6 };
+          }
+        }).addTo(map);
       }
-    }).addTo(map);
+    }
+
+    // Puntos individuales
+    if (mostrarPuntos) {
+      splitState.capas[side].puntos = L.geoJSON({ type: 'FeatureCollection', features }, {
+        pointToLayer: (feature, latlng) => {
+          const v = getValorIndice(feature.properties, indice);
+          const r = v !== null ? clasificarValor(v, indice) : null;
+          return L.circleMarker(latlng, { radius: 2, fillColor: r ? r.color : '#888', color: 'transparent', fillOpacity: 0.85, weight: 0 });
+        },
+        onEachFeature: (feature, layer) => {
+          layer.on('click', () => mostrarPopupComparativo(feature, layer, map, indice));
+        }
+      }).addTo(map);
+    }
 
     // Ajustar bounds
     if (features.length > 0) {
-      try { const b = splitState.capas[side].puntos.getBounds(); if (b.isValid()) map.fitBounds(b, { padding: [20, 20] }); } catch(e) {}
+      try {
+        const capaBounds = splitState.capas[side].puntos || splitState.capas[side].pol;
+        if (capaBounds) { const b = capaBounds.getBounds(); if (b.isValid()) map.fitBounds(b, { padding: [20, 20] }); }
+      } catch(e) {}
     }
 
     // Leyenda
     const legEl = document.getElementById(`split-legend-${side}`);
     if (legEl) {
       legEl.innerHTML = `<div style="font-size:0.65rem;font-weight:700;color:var(--accent);margin-bottom:5px">${cfg.nombre}</div>` +
-        cfg.rangos.map(r => `<div style="display:flex;align-items:center;gap:5px;padding:1px 0"><div style="width:9px;height:9px;border-radius:50%;background:${r.color};flex-shrink:0"></div><span style="color:#e6edf3">${r.label}</span></div>`).join('');
+        cfg.rangos.map(r => `<div style="display:flex;align-items:center;gap:5px;padding:1px 0"><div style="width:9px;height:9px;border-radius:50%;background:${r.color};flex-shrink:0"></div><span style="color:#e6edf3;font-size:0.65rem">${r.label}</span></div>`).join('');
     }
   });
 }
@@ -2108,7 +2148,7 @@ function crearMiniMapa(containerId, features, indice, fecha) {
     pointToLayer: (feature, latlng) => {
       const v = getValorIndice(feature.properties, indice);
       const r = v !== null ? clasificarValor(v, indice) : null;
-      return L.circleMarker(latlng, { radius: 3, fillColor: r ? r.color : '#888', color: 'transparent', fillOpacity: 0.85, weight: 0 });
+      return L.circleMarker(latlng, { radius: 2, fillColor: r ? r.color : '#888', color: 'transparent', fillOpacity: 0.85, weight: 0 });
     }
   }).addTo(map);
 
